@@ -10,19 +10,16 @@
 --  |-contact
 -- |-place
 
-
+CREATE TYPE status AS ENUM ('default', 'maybe', 'inbox', 'urgent');
 
 CREATE TABLE information(
-	inbox		boolean DEFAULT FALSE NOT NULL,
-	urgent		boolean DEFAULT FALSE NOT NULL,
-	maybe		boolean DEFAULT FALSE NOT NULL,
+	status 		status DEFAULT 'default' NOT NULL,
 	delay		timestamp,
 	last_edited timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	created_at 	timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	id 			serial PRIMARY KEY
 );
 
---DROP TABLE file CASCADE;
 CREATE TABLE "file"(
 	id 			serial PRIMARY KEY,
 	name		varchar NOT NULL	
@@ -51,13 +48,11 @@ CREATE TABLE project(
 	id			integer PRIMARY KEY REFERENCES task(id) ON DELETE CASCADE
 );
 
---DROP TABLE asaplist CASCADE;
 CREATE TABLE asaplist(
 	id 			serial PRIMARY KEY,
 	name 		varchar NOT NULL UNIQUE
 );
 
---DROP TABLE asap CASCADE;
 CREATE TABLE asap(
 	project 	integer REFERENCES project(id),
 	asaplist 	integer REFERENCES asaplist(id) ON DELETE RESTRICT NOT NULL,
@@ -68,7 +63,6 @@ CREATE TABLE social_entity(
 	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE
 );
 
---DROP TABLE circle CASCADE;
 CREATE TABLE circle(
 	id 			integer PRIMARY KEY REFERENCES social_entity(id) ON DELETE CASCADE,
 	name 		varchar	NOT NULL UNIQUE
