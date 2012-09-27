@@ -44,6 +44,7 @@ CREATE TABLE "references"(
 );
 
 CREATE TABLE project(
+	collapsed 	boolean DEFAULT false NOT NULL,
 	parent 		integer REFERENCES project(id),
 	id			integer PRIMARY KEY REFERENCES task(id) ON DELETE CASCADE
 );
@@ -104,30 +105,55 @@ CREATE TABLE participants(
 --  |-contact
 -- |-place
 
-DROP VIEW "type";
-CREATE VIEW "type" AS (
-			SELECT information.id, 'note' as "type" FROM information, note WHERE information.id = note.id
-	UNION	SELECT information.id, 'project' as "type" FROM information, project WHERE information.id = project.id
-	UNION	SELECT information.id, 'asap' as "type"  FROM information, asap WHERE information.id = asap.id
-	UNION	SELECT information.id, 'appointment' as "type" FROM information, appointment WHERE information.id = appointment.id
-	UNION	SELECT information.id, 'circle' as "type" FROM information, circle WHERE information.id = circle.id
-	UNION	SELECT information.id, 'contact' as "type" FROM information, contact WHERE information.id = contact.id
-	UNION	SELECT information.id, 'place' as "type" FROM information, place WHERE information.id = place.id
-	) ORDER BY id;
-DROP VIEW "inbox";
-CREATE VIEW "inbox" AS
-	SELECT * FROM information WHERE inbox = TRUE;
-DROP VIEW "later";
-CREATE VIEW "later" AS
-	SELECT * FROM information WHERE maybe = TRUE;
-DROP VIEW "infoview" CASCADE;
+CREATE VIEW "type" AS 
+			SELECT information.id, 'note' as "type" FROM information, note USING (id)
+	UNION	SELECT information.id, 'project' as "type" FROM information, project USING (id)
+	UNION	SELECT information.id, 'asap' as "type"  FROM information, asap USING (id)
+	UNION	SELECT information.id, 'appointment' as "type" FROM information, appointment USING (id)
+	UNION	SELECT information.id, 'circle' as "type" FROM information, circle USING (id)
+	UNION	SELECT information.id, 'contact' as "type" FROM information, contact USING (id)
+	UNION	SELECT information.id, 'place' as "type" FROM information, place USING (id);
+
+
 CREATE VIEW "infoview" AS
-	SELECT id, EXTRACT(EPOCH FROM created_at) AS created_at, EXTRACT(EPOCH FROM last_edited) AS last_edited FROM information;
+	SELECT id, EXTRACT(EPOCH FROM created_at) AS created_at, EXTRACT(EPOCH FROM last_edited) AS last_edited, status, "type"
+		FROM information, "type" USING (id);
+
+
+CREATE VIEW "inbox" AS
+	SELECT * 
+		FROM infoview WHERE status >= 'inbox' AND delay <= CURRENT_TIMESTAMP;
+
+
+CREATE VIEW "maybe" AS
+	SELECT *
+		FROM infoview WHERE status = 'maybe';
+
+
 CREATE VIEW asapview AS
-	SELECT varchar 'asap' AS type, i.*, t.description, EXTRACT(EPOCH FROM t.completed) AS completed, l.name AS asaplist, a.project, p.description AS projectdescription FROM infoview i INNER JOIN task t USING (id) INNER JOIN asap a USING (id) LEFT OUTER JOIN task p ON a.project=p.id INNER JOIN asaplist l ON l.id = a.asaplist;
+	SELECT i.*, t.description, EXTRACT(EPOCH FROM t.completed) AS completed, l.name AS asaplist, a.project, p.description AS projectdescription
+		FROM infoview i
+			INNER JOIN task t USING (id) 
+			INNER JOIN asap a USING (id) 
+			LEFT OUTER JOIN task p ON a.project=p.id 
+			INNER JOIN asaplist l ON l.id = a.asaplist;
+
+
 CREATE VIEW projectview AS
-	SELECT varchar 'project' AS type, i.*, t.description, EXTRACT(EPOCH FROM t.completed) AS completed, p.parent FROM infoview i INNER JOIN task t USING (id) INNER JOIN project p USING (id);
+	SELECT i.*, t.description, EXTRACT(EPOCH FROM t.completed) AS completed, p.parent, p.collapsed
+		FROM infoview i 
+			INNER JOIN task t USING (id)
+			INNER JOIN project p USING (id);
+
+
 CREATE VIEW "appointmentview" AS
-	SELECT varchar 'appointment' AS type, i.*, "date", time, length, description FROM infoview i INNER JOIN appointment USING (id);
+	SELECT i.*, "date", time, length, description
+		FROM infoview i
+			INNER JOIN appointment USING (id);
+
+
 CREATE VIEW "noteview" AS
-	SELECT varchar 'note' AS type, i.*, content, attachment, f.name AS attachmentname FROM infoview i JOIN note n USING (id) LEFT OUTER JOIN file f ON f.id = n.attachment;	
+	SELECT i.*, content, attachment, f.name AS attachmentname
+		FROM infoview i 
+			JOIN note n USING (id)
+			LEFT OUTER JOIN file f ON f.id = n.attachment;	
