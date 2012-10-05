@@ -25,10 +25,14 @@ CREATE TABLE "file"(
 	name		varchar NOT NULL	
 );
 
+CREATE TABLE attachments(
+	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE
+	fileid 		integer PRIMARY KEY REFERENCES "file"(id) ON DELETE CASCADE
+)
+
 CREATE TABLE note(
 	content 	varchar NOT NULL,
 	id			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
-	attachment 	integer REFERENCES "file"(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE task(
@@ -71,26 +75,169 @@ CREATE TABLE circle(
 
 CREATE TABLE contact(
 	id 			integer PRIMARY KEY REFERENCES social_entity(id) ON DELETE CASCADE
+	name 		varchar,
+	first_name	varchar,
+	middle_names varchar,
+	title		varchar,
+	prefix		varchar,
+	suffix		varchar,
+	nickname	varchar,
+	birthname	varchar,
+	birthday 	date
+);
+
+CREATE TABLE circle_member(
+	contactid 	integer REFERENCES contact(id) ON DELETE CASCADE,
+	circleid 	integer REFERENCES circle(id) ON DELETE CASCADE,
+	PRIMARY KEY (contactid, circleid)
 );
 
 CREATE TABLE place(
-	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE
+	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
+	country 	varchar,
+	state 		varchar,
+	city 		varchar,
+	postal_code varchar,
+	street 		varchar,
+	house 		varchar,
+	building 	varchar,
+	room 		varchar,
+	GPSx 		float,
+	GPSy 		float,
+	part_of 	integer REFERENCES place(id)
 );
 
+CREATE TABLE addresses(
+	contactid 	integer REFERENCES contact(id) ON DELETE CASCADE,
+	description varchar,
+	placeid 	integer REFERENCES place(id) ON DELETE CASCADE,
+	PRIMARY KEY (contactid, placeid)
+);
 
 CREATE TABLE appointment(
 	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
-	"date"		date 	NOT NULL,
+	startdate	date 	NOT NULL,
+	enddate		date 	NOT NULL,
 	time		time,
 	length 		interval,
 	description	varchar NOT NULL,
-	place		integer REFERENCES place(id)
+	placeid		integer REFERENCES place(id),
+	timezone 	integer
+);
+
+CREATE TYPE exception_move AS ENUM('no', 'before', 'after');
+
+CREATE TABLE appointment_exception(
+	appointmentid 	integer REFERENCES appointment(id) ON DELETE CASCADE,
+	exceptionid 	integer REFERENCES appointment(id) ON DELETE CASCADE,
+	exception_move 	exception_move DEFAULT 'no' NOT NULL,
+	PRIMARY KEY(appointmentid, exceptionid)
+);
+
+CREATE TYPE filter_type AS ENUM('dayofweek', 'dayofmonth', 'weekofmonth', 'monthofyear', 'weeksincestart', 'daysincestart', 'monthsincestart', 'yearsincestart');
+
+CREATE TABLE day_filter(
+	appointmentid 	integer REFERENCES appointment(id) ON DELETE CASCADE,
+	filter_type 	filter_type NOT NULL,
+	value 			integer,
+	PRIMARY KEY(appointmentid, filter_type, value)
 );
 
 CREATE TABLE participants(
 	appointmentid integer REFERENCES appointment(id) ON DELETE CASCADE,
 	participantid integer REFERENCES social_entity(id) ON DELETE CASCADE,
 	PRIMARY KEY (appointmentid, participantid)
+);
+
+CREATE TABLE protocol(
+	id 			serial PRIMARY KEY,
+	name 		varchar NOT NULL
+);
+
+CREATE TABLE server(
+	id 			serial PRIMARY KEY,
+	name 		varchar NOT NULL,
+	protocolid 	integer REFERENCES protocol(id) NOT NULL ON DELETE CASCADE,
+	UNIQUE(name, protocolid)
+);
+
+CREATE TABLE account(
+	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
+	username 	varchar NOT NULL,
+	name 		varchar,
+	serverid 	integer REFERENCES server(id) NOT NULL ON DELETE CASCADE
+);
+
+CREATE TABLE accounts(
+	contactid 	integer REFERENCES contact(id) ON DELETE CASCADE,
+	description varchar,
+	accountid 	integer REFERENCES account(id) ON DELETE CASCADE,
+	priority 	integer NOT NULL,
+	PRIMARY KEY(contactid, accountid)
+);
+
+CREATE TABLE room(
+	id 			integer PRIMARY KEY REFERENCES account(id) ON DELETE CASCADE,
+	motd 		varchar
+);
+
+CREATE TABLE room_member(
+	accountid 	integer REFERENCES account(id) ON DELETE CASCADE,
+	roomid 		integer REFERENCES room(id) ON DELETE CASCADE,
+	role 		varchar,
+	PRIMARY KEY(accountid, roomid)
+);
+
+CREATE TYPE online_state AS ENUM ('online', 'away', 'na', 'dnd', 'invisible');
+
+CREATE TABLE "resource"(
+	id 			serial PRIMARY KEY,
+	name 		varchar,
+	status 		online_state,
+	message 	varchar
+);
+
+CREATE TABLE communication(
+	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
+	time 		timestamp,
+);
+
+CREATE TABLE message(
+	id 			integer PRIMARY KEY REFERENCES communication(id) ON DELETE CASCADE,
+	subject 	varchar,
+	body 		varchar
+);
+	
+CREATE TABLE presence(
+	id 			integer PRIMARY KEY REFERENCES communication(id) ON DELETE CASCADE,
+);
+
+CREATE TABLE resources(
+	presenceid 	integer PRIMARY KEY REFERENCES presence(id) ON DELETE CASCADE,
+	resourceid 	integer PRIMARY KEY REFERENCES "resource"(id) ON DELETE CASCADE,
+	PRIMARY KEY(presenceid, resourcid)
+);
+
+CREATE TABLE header(
+	messageid 	integer PRIMARY KEY REFERENCES message(id) ON DELETE CASCADE,
+	content 	varchar
+);
+
+CREATE TABLE outbox(
+	communicationid integer PRIMARY KEY REFERENCES message(id) ON DELETE CASCADE,
+);
+
+CREATE TABLE draft(
+	communicationid integer PRIMARY KEY REFERENCES message(id) ON DELETE CASCADE,
+);
+
+CREATE TYPE recipient_field AS ENUM('to', 'cc', 'bcc');
+
+CREATE TABLE recipient(
+	messageid 	integer REFERENCES message(id) ON DELETE CASCADE,
+	accountid 	integer REFERENCES account(id) ON DELETE CASCADE,
+	field 		recipient_field,
+	PRIMARY KEY(messagid, accountid, field)
 );
 
 --

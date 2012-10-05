@@ -97,6 +97,12 @@ module.exports.connect = (connectionString) ->
 				values: [@id]
 			answer.name
 
+		delete: ->
+			query
+				text: 'DELETE FROM file WHERE id=$1'
+				values: [@id]
+
+
 	class Note extends Information
 
 		create: (content, attachment=null) ->
@@ -105,6 +111,11 @@ module.exports.connect = (connectionString) ->
 				text: 'INSERT INTO note (id, content, attachment) VALUES ($1, $2, $3);'
 				values: [@id, content, attachment]
 			@id
+
+		addAttachment: (attachment) ->
+			query
+				text: 'UPDATE note SET attachment=$2 WHERE id=$1;'
+				values: [@id, attachment]
 
 		change: (content) ->
 			query
@@ -115,7 +126,6 @@ module.exports.connect = (connectionString) ->
 			query
 				text: 'UPDATE note SET attachment=NULL WHERE id=$1'
 				values: [@id]
-
 
 
 	class Task extends Information
@@ -132,6 +142,11 @@ module.exports.connect = (connectionString) ->
 				text: 'UPDATE task SET completed=CURRENT_TIMESTAMP WHERE id=$1'
 				values: [@id]
 
+		undo: ->
+			query
+				text: 'UPDATE task SET completed=NULL WHERE id=$1'
+				values: [@id]
+
 	class Project extends Task
 
 		create: (description, referencing=null, parent=null) ->
@@ -145,6 +160,16 @@ module.exports.connect = (connectionString) ->
 			query
 				text: 'UPDATE project SET parent=$2 WHERE id=$1;'
 				values: [@id, parent]
+
+		collapse: ->
+			query
+				text: 'UPDATE project SET collapsed=TRUE WHERE id=$1;'
+				values: [@id]
+
+		uncollapse: ->
+			query
+				text: 'UPDATE project SET collapsed=FALSE WHERE id=$1;'
+				values: [@id]
 
 		@getAll: () ->
 			queryMany
