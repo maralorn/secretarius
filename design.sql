@@ -10,14 +10,20 @@
 --  |-contact
 -- |-place
 
-CREATE TYPE status AS ENUM ('default', 'maybe', 'inbox', 'urgent');
+CREATE TYPE status AS ENUM ('delete', 'default', 'maybe', 'inbox', 'urgent');
 
 CREATE TABLE information(
+	id 			serial PRIMARY KEY
 	status 		status DEFAULT 'default' NOT NULL,
 	delay		timestamp,
 	last_edited timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	created_at 	timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	id 			serial PRIMARY KEY
+);
+
+CREATE TABLE "references"(
+	id			integer REFERENCES information(id) ON DELETE CASCADE,
+	referenceid	integer REFERENCES information(id) ON DELETE CASCADE,
+	PRIMARY KEY (id, referenceid)
 );
 
 CREATE TABLE "file"(
@@ -28,29 +34,23 @@ CREATE TABLE "file"(
 CREATE TABLE attachments(
 	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE
 	fileid 		integer PRIMARY KEY REFERENCES "file"(id) ON DELETE CASCADE
-)
+);
 
 CREATE TABLE note(
-	content 	varchar NOT NULL,
 	id			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
+	content 	varchar NOT NULL,
 );
 
 CREATE TABLE task(
+	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE
 	description varchar NOT NULL,
 	completed 	timestamp,
-	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE
-);
-
-CREATE TABLE "references"(
-	id			integer REFERENCES information(id) ON DELETE CASCADE,
-	referenceid	integer REFERENCES information(id) ON DELETE CASCADE,
-	PRIMARY KEY (id, referenceid)
 );
 
 CREATE TABLE project(
+	id			integer PRIMARY KEY REFERENCES task(id) ON DELETE CASCADE
 	collapsed 	boolean DEFAULT false NOT NULL,
 	parent 		integer REFERENCES project(id),
-	id			integer PRIMARY KEY REFERENCES task(id) ON DELETE CASCADE
 );
 
 CREATE TABLE asaplist(
@@ -117,12 +117,12 @@ CREATE TABLE addresses(
 CREATE TABLE appointment(
 	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
 	startdate	date 	NOT NULL,
-	enddate		date 	NOT NULL,
+	enddate		date,
 	time		time,
 	length 		interval,
 	description	varchar NOT NULL,
 	placeid		integer REFERENCES place(id),
-	timezone 	integer
+	timezone 	varchar 
 );
 
 CREATE TYPE exception_move AS ENUM('no', 'before', 'after');
@@ -151,7 +151,7 @@ CREATE TABLE participants(
 
 CREATE TABLE protocol(
 	id 			serial PRIMARY KEY,
-	name 		varchar NOT NULL
+	name 		varchar NOT NULL UNIQUE
 );
 
 CREATE TABLE server(
@@ -161,11 +161,16 @@ CREATE TABLE server(
 	UNIQUE(name, protocolid)
 );
 
-CREATE TABLE account(
+CREATE TABLE communicator(
 	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
+	default_status status DEFAULT 'inbox' NOT NULL,
 	username 	varchar NOT NULL,
 	name 		varchar,
 	serverid 	integer REFERENCES server(id) NOT NULL ON DELETE CASCADE
+);
+
+CREATE TABLE account(
+	id 			integer PRIMARY KEY REFERENCES communicator(id) ON DELETE CASCADE,
 );
 
 CREATE TABLE accounts(
@@ -177,7 +182,7 @@ CREATE TABLE accounts(
 );
 
 CREATE TABLE room(
-	id 			integer PRIMARY KEY REFERENCES account(id) ON DELETE CASCADE,
+	id 			integer PRIMARY KEY REFERENCES communicator(id) ON DELETE CASCADE,
 	motd 		varchar
 );
 
@@ -199,7 +204,8 @@ CREATE TABLE "resource"(
 
 CREATE TABLE communication(
 	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
-	time 		timestamp,
+	"from" 		integer REFERENCES communicator(id) ON DELETE CASCADE,
+	time 		timestamp
 );
 
 CREATE TABLE message(
@@ -237,10 +243,24 @@ CREATE TABLE recipient(
 	messageid 	integer REFERENCES message(id) ON DELETE CASCADE,
 	accountid 	integer REFERENCES account(id) ON DELETE CASCADE,
 	field 		recipient_field,
+	"resource" 	varchar,
 	PRIMARY KEY(messagid, accountid, field)
 );
 
---
+CREATE TABLE daemon(
+	id 			serial PRIMARY KEY,
+	name 		varchar NOT NULL,
+	status 		varchar NOT NULL,
+	timestamp 	timestamp,
+	message 	varchar
+);
+
+CREATE TABLE useraccount(
+	id 			integer PRIMARY KEY REFERENCES account(id) ON DELETE CASCADE,
+	password 	varchar,
+	status 		online_state,
+	message 	varchar
+);
 -- +information
 -- |-note
 -- |+task
