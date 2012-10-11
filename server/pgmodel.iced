@@ -26,7 +26,6 @@ module.exports.connect = (connectionString) ->
 	queryOne = (config) ->
 		queryMany(config)[0]
 
-
 	class PGObject
 		constructor: (@id) ->
 
@@ -341,7 +340,7 @@ module.exports.connect = (connectionString) ->
 
 	class Account extends Communicator
 		create: (username, server) ->
-		@find: (username, server)
+		@find: (username, server) ->
 		join: (room, role=null) ->
 		leave: (room, role=null) ->
 	
@@ -380,7 +379,7 @@ module.exports.connect = (connectionString) ->
 		delete: ->
 	
 	class Daemon extends PGObject
-		registrate: (name, status)
+		registrate: (name, status) ->
 		setStatus: (status) ->
 		setMessage: (message) ->
 		deregistrate: ->
@@ -418,7 +417,7 @@ module.exports.connect = (connectionString) ->
 		Asap: Asap
 		Information: Information
 		Project: Project
-		Asaplist: Asaplist
+		AsapList: AsapList
 		Circle:Circle
 		Contact:Contact
 		Place:Place
