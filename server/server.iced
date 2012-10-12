@@ -2,9 +2,8 @@ fs = require "fs"
 
 connectionString = "bla:bla@blub.de"
 debug = true
-clientdir = "#{__dirname}/client"
-bothdir = "#{__dirname}/both"
-serverdir = "#{__dirname}/server"
+clientdir = "#{__dirname}/../client"
+bothdir = "#{__dirname}/../both"
 
 lib = require("stitch").createPackage
 	paths: [clientdir,bothdir]
@@ -47,8 +46,9 @@ app.get "/style.css", (req, res) ->
 		csscache = css
 	res.set "Content-Type", "text/css"
 	res.send csscache
-require("#{serverdir}/controller").serve app,
-	require("#{bothdir}/model").extend require("#{serverdir}/pgmodel").connect connectionString
+
+require("controller").serve app,
+	require("model").extend require("pgmodel").connect connectionString
 
 require "systemd"
 require("http").createServer(app).listen if process.env.LISTEN_PID > 0 then "systemd" else 3000

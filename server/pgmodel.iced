@@ -2,7 +2,9 @@ hash = do ->
 	crypto = require 'crypto'
 	(key) -> crypto.createHash('md5').update(key).digest 'base64'
 
-module.exports.connect = (connectionString) ->
+{ModelObject} = require "basemodel"
+
+exports.connect = (connectionString) ->
 	pg = require('pg').native
 
 	query = (config) ->
@@ -26,7 +28,7 @@ module.exports.connect = (connectionString) ->
 	queryOne = (config) ->
 		queryMany(config)[0]
 
-	class PGObject
+	class PGObject extends ModelObject
 		constructor: (@id) ->
 
 
@@ -385,31 +387,31 @@ module.exports.connect = (connectionString) ->
 		deregistrate: ->
 		@getAll: ->
 	
-	class Maybe
+	class Maybe extends ModelObject
 
-		@getList: ->
+		size: ->
+		getList: ->
 			queryMany
 				text: 'SELECT * FROM maybe ORDER BY last_edited;'
 				values: []
 	
-	class Inbox
+	class Inbox extends ModelObject
 		
-		@size: ->
+		size: ->
 			answer = queryOne
 				text: 'SELECT count(*) FROM inbox;'
 				value: []
 			answer.count
 
-		@urgentCount: ->
-			answer = queryOne
-				text: 'SELECT count(*) FROM inbox WHERE status=urgent'
-				value: []
-			answer.count
-
-		@getFirst: ->
+		getFirst: ->
 			queryOne
 				text: 'SELECT id, type FROM inbox ORDER BY created_at LIMIT 1;'
 				values: []
+	
+	class Urgent extends ModelObject
+
+		size: ->
+		getList: ->
 
 	model =
 		File: File
@@ -431,3 +433,4 @@ module.exports.connect = (connectionString) ->
 		Resource:Resource
 		Inbox:Inbox
 		Maybe:Maybe
+		Urgent:Urgent

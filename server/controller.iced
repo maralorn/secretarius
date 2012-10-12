@@ -1,1 +1,1 @@
-module.exports.serve = (app, model) ->
+exports.serve = (app, model) ->

@@ -1,2 +1,2 @@
-module.exports.extend = (model) ->
+exports.extend = (model) ->
 	model

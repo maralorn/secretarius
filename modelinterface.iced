@@ -1,13 +1,8 @@
-{ModelObject} = require "basemodel"
-
-exports.connect = () ->
 	class PGObject extends ModelObject
 		constructor: (@id) ->
 
 	class Information extends PGObject
 		constructor: (@id) ->
-			tempType = @constructor.name.toLowerCase()
-			@type = tempType if tempType != 'information'
 		create: (status = 'default', referencing=null) ->
 		addReference: (reference) ->
 		removeReference: (reference) ->
@@ -76,27 +71,19 @@ exports.connect = () ->
 		leaveCircle: (circle) ->
 
 	class Place extends Information
-
 		create: (valueMap) ->
-
 		setValues: (valueMap) ->
 		setParent: (place) ->
 		removeParent: ->
 
 	class Appointment extends Information
-
 		create: (description, date, time=null, length=null, referencing=null) ->
-
 		setValues: (valueMap) ->
-		
 		setPlace: (place) ->
-
 		addException: (appointment, exceptionMove='no') ->
 		removeException: (appointment) ->
-
 		addFilter: (type, value) ->
 		removeFilter: (type, value) ->
-
 		addParticipant: (participant) ->
 		removeParticipant: (participant) ->
 
@@ -168,8 +155,8 @@ exports.connect = () ->
 		getFirst: ->
 
 	class Urgent extends ModelObject
-		 size: ->
-		 getList: ->
+		size: ->
+		getList: ->
 
 	model =
 		File: File
