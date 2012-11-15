@@ -1,5 +1,9 @@
 {ModelObject} = require "basemodel"
 
+notImplemented = (errorcallback) ->
+	alert("This Function is not implemented!")
+	errorcallback?("This Function is not implemented!")
+
 exports.connect = () ->
 	class PGObject extends ModelObject
 		constructor: (@id) ->
@@ -7,20 +11,89 @@ exports.connect = () ->
 	class Information extends PGObject
 		constructor: (@id) ->
 			tempType = @constructor.name.toLowerCase()
-			@type = tempType if tempType != 'information'
-		create: (status = 'default', referencing=null) ->
-		addReference: (reference) ->
-		removeReference: (reference) ->
-		delete: ->
-		getType: ->
-		get: ->
-		setStatus: (status) ->
-		setDelay: (delay) ->
-		attach: (file) ->
-		detach: (file) ->
-		_set: (table, map, allowed) ->
-		getReferences: ->
+			@type = tempType if tempType != "information"
 
+		create: (status = "default", referencing=null, callback, errorcallback) ->
+			notImplemented(errorcallback)
+
+		addReference: (reference, callback, errorcallback) ->
+			@_patch
+				method: "addReference"
+				reference: reference.id,
+					callback, errorcallback
+		removeReference: (reference, callback, errorcallback) ->
+			@_patch
+				method: "removeReference"
+				reference: reference.id,
+					callback, errorcallback
+			
+		delete: (callback, errorcallback) ->
+			@_delete callback, errorcallback
+
+		getType: (callback, errorcallback) ->
+			unless @type?
+				await @_get
+					fields: ["type"],
+						defer({type: @type}), errorcallback
+			callback? @type
+			
+
+		get: (callback, errorcallback) ->
+			await @getType defer()
+			unless @values?
+				await @_get null, defer(@values), errorcallback
+				(@[key] = value) for key,value of @values
+			callback? @values
+
+		setStatus: (status, callback, errorcallback) ->
+			@_patch
+				method: "setStatus"
+				status: status,
+					callback, errorcallback
+
+		setDelay: (delay, callback, errorcallback) ->
+			@_patch
+				method: "setDelay"
+				delay: delay,
+					callback, errocallback
+
+		attach: (file, callback, errorcallback) ->
+			@_patch
+				method: "attach"
+				file: file.id,
+					callback, errorcallback
+
+		detach: (file, callback, errorcallback) ->
+			@_patch
+				method: "detach"
+				file: file.id,
+					callback, errorcallback
+
+		getReferences: (callback, errorcallback) ->
+			@_get
+				fields: "references",
+					callback, errorcallback
+				
+		_get: (data, callback, errorcallback) ->
+			@_call "get", "#{@id}", data, callback, errorcallback
+		_put: (data, callback, errorcallback) ->
+			@_call "put", "#{@id}", data, callback, errorcallback
+		_delete: (callback, errorcallback) ->
+			@_call "delete", "#{@id}", callback, errorcallback
+		_patch: (data, callback, errorcallback) ->
+			@_call "patch", "#{@id}", data, callback, errorcallback
+		_post: (data) ->
+			@_call "post", null, data, callback, errorcallback
+		_call: (type, url, data, callback, errorcallback) ->
+			url = "#{@type}#{if url? then "/#{url}" else ""}"
+			request =
+				url: url
+				type: type
+				success: callback
+				dataType: "json"
+			if data? then request.data = data
+			console.log "#{type.toUpperCase()} #{url} (#{data})"
+			$.ajax(request)
 
 	class File extends PGObject
 		create: (name) ->
@@ -29,7 +102,14 @@ exports.connect = () ->
 
 	class Note extends Information
 		create: (content, attachment=null) ->
+			{id: @id} = @_post
+				content: content
+				attachment: if attachment? then attachment.id else null
+
 		change: (content) ->
+			@_patch
+				method: "change"
+				content: content
 
 	class Task extends Information
 		create: (description, referencing=null) ->
@@ -165,7 +245,8 @@ exports.connect = () ->
 	
 	class Inbox extends ModelObject
 		size: ->
-		getFirst: ->
+		getFirst: (callback, errorcallback) ->
+			callback new Note()
 
 	class Urgent extends ModelObject
 		 size: ->

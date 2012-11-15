@@ -7,26 +7,27 @@ hash = do ->
 exports.connect = (connectionString) ->
 	pg = require('pg').native
 
-	query = (config) ->
+	query = (config, callback, errorcallback) ->
 		config.name = hash config.text
 		await pg.connect connectionString, defer client
 		request = client.query config
-		request.on 'error', (error) -> console.log error
-		request
+		request.on 'error', (error) -> errcb error
+		callback? request
 	
-	queryMany = (config) ->
+	queryMany = (config, callback, errorcallback) ->
 		if config.callback?
 			cb = config.callback
 			delete config.callback
 		else
 			cb = (row, result) -> result.addRow(row)
-		request = query config
+		await query(config, defer request, errorcallback)
 		request.on 'row', cb
 		await request.on 'end', defer result
-		result.rows
+		callback result.rows
 		
-	queryOne = (config) ->
-		queryMany(config)[0]
+	queryOne = (config, callback, errorcallback) ->
+		await queryMany config, defer result, errorcallback
+		callback result[0]
 
 	class PGObject extends ModelObject
 		constructor: (@id) ->
@@ -38,67 +39,80 @@ exports.connect = (connectionString) ->
 			tempType = @constructor.name.toLowerCase()
 			@type = tempType if tempType != 'information'
 			
-		create: (status = 'default', referencing=null) ->
-			{id: @id} = queryOne
+		create: (status = 'default', referencing=null, callback, errorcallback) ->
+			await queryOne
 				text: 'INSERT INTO information (status) VALUES ($1) RETURNING id;'
-				values: [status]
+				values: [status],
+					defer {id: @id}, errorcallback
 			@addReference referencing if referencing?
-			@id
+			callback? @id
 
-		addReference: (reference) ->
+		addReference: (reference, callback, errorcallback) ->
 			query
 				text: 'INSERT INTO "references" (id, referenceid) VALUES ($1, $2);'
-				values: [@id, reference.id]
+				values: [@id, reference.id],
+					callback, errorcallback
 
-		removeReference: (reference) ->
+		removeReference: (reference, callback, errorcallback) ->
 			query
 				text: 'DELETE FROM references WHERE id=$1 AND referenceid=$2'
-				values: [@id, reference.id]
+				values: [@id, reference.id],
+					callback, errorcallback
 
-		delete: ->
+		delete: (callback, errorcallback) ->
 			query
 				text: 'DELETE FROM information WHERE id=$1;'
-				values: [@id]
+				values: [@id],
+					callback, errorcallback
 
-		getType: ->
-			{type: @type} = queryOne
-				text: 'SELECT type FROM type WHERE id=$1;'
-				values: [@id]
+		getType: (callback, errorcallback) ->
+			unless @type
+				await queryOne
+					text: 'SELECT type FROM type WHERE id=$1;'
+					values: [@id],
+						defer({type: @type}), errorcallback
+			callback? @type
 
-		get: ->
-			@getType() unless @type?
-			answer = queryOne
+		get: (callback, errorcallback) ->
+			await @getType defer()
+			await queryOne
 				text: 'SELECT * FROM #{@type}view WHERE id=$1;'
-				values: [@id]
+				values: [@id],
+					defer(answer), errorcallback
 			(@[key] = value) for key,value of answer
-			answer
+			callback answer
 
-		setStatus: (status) ->
+		setStatus: (status, callback, errorcallback) ->
 			query
 				text: 'UPDATE information SET status=$2 WHERE id=$1;'
-				values: [@id, status]
+				values: [@id, status],
+					callback, errorcallback
 
-		setDelay: (delay) ->
+		setDelay: (delay, callback, errorcallback) ->
 			query
 				text: 'UPDATE information SET status="inbox", delay=$2 WHERE id=$1;'
-				values: [@id, delay]
+				values: [@id, delay],
+					callback, errorcallback
 
-		attach: (file) ->
+		attach: (file, callback, errorcallback) ->
 			query
 				text: 'INSERT INTO "attachments" (id, fileid) VALUES ($1, $2)'
-				values: [@id, file.id]
+				values: [@id, file.id],
+					callback, errorcallback
 
-		detach: (file) ->
+		detach: (file, callback, errorcallback) ->
 			query
 				text: 'DELETE FROM "attachments" WHERE id=$1 AND fileid=$2)'
-				values: [@id, file.id]
+				values: [@id, file.id],
+					callback, errorcallback
 
-		_set: (table, map, allowed) ->
+		_set: (table, map, allowed, callback, errorcallback) ->
 			for key, value of map
-				if key in allowed of not allowed?
+				if not allowed? or key in allowed
 					query
 						text: 'UPDATE #{table} SET $2=$3 WHERE id=$1;'
-						values: [@id, key, value]
+						values: [@id, key, value],
+							callback, errorcallback
 
 		getReferences: ->
 
@@ -125,17 +139,19 @@ exports.connect = (connectionString) ->
 
 	class Note extends Information
 
-		create: (content, attachment=null) ->
-			super()
-			queryOne
+		create: (content, attachment=null, callback, errorcallback) ->
+			await super defer(id), errorcallback
+			await queryOne
 				text: 'INSERT INTO note (id, content, attachment) VALUES ($1, $2, $3);'
-				values: [@id, content, attachment]
-			@id
+				values: [@id, content, attachment],
+					defer(id), errorcallback
+			callback? id
 
-		change: (content) ->
+		change: (content, callback, errorcallback) ->
 			query
 				text: 'UPDATE note SET content=$2 WHERE id=$1'
-				values: [@id, content]
+				values: [@id, content],
+					callback, errorcallback
 
 
 	class Task extends Information

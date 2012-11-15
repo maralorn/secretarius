@@ -1,6 +1,6 @@
 fs = require "fs"
 
-connectionString = "bla:bla@blub.de"
+connectionString = "maralorn:bla@blub.de"
 debug = true
 clientdir = "#{__dirname}/../client"
 bothdir = "#{__dirname}/../both"
@@ -9,7 +9,8 @@ lib = require("stitch").createPackage
 	paths: [clientdir,bothdir]
 	compilers:
 		iced: (module, filename) ->
-			content = require("iced-coffee-script").compile fs.readFileSync filename, "utf8"
+			content = require("iced-coffee-script").compile fs.readFileSync(filename, "utf8"),
+				runtime: "window"
 			module._compile content, filename
 		jade: (module, filename) ->
 			content = require("jade").compile fs.readFileSync(filename, "utf8"),
@@ -20,7 +21,9 @@ lib = require("stitch").createPackage
 			module._compile "exports.render = #{content}", filename
 
 htmlcache = csscache = jscache = null
-app = require("express")()
+app = (express = require "express")()
+	
+app.use express.static "client/static"
 
 app.get "/", (req, res) ->
 	unless htmlcache? and not debug
