@@ -254,16 +254,16 @@ exports.connect = () ->
 		@getAll: ->
 	
 	class Maybe extends PGObject
-		size: ->
+		getSize: ->
 		getList: ->
 	
 	class Inbox extends PGObject
-		size: (callback) ->
-			await @_get null, defer(error, answer), "inbox/size"
+		getSize: (callback) ->
+			await @_get {filter: "size"}, defer(error, answer), "inbox"
 			callback? error, answer.size
 
 		getFirst: (callback) ->
-			await @_get null, defer(error, answer), "inbox/first"
+			await @_get {filter: "first"}, defer(error, answer), "inbox"
 			if answer.id?
 				info = new Information
 				info._set answer
@@ -272,7 +272,7 @@ exports.connect = () ->
 			callback? error, info
 
 	class Urgent extends PGObject
-		 size: ->
+		 getSize: ->
 		 getList: ->
 
 	model =

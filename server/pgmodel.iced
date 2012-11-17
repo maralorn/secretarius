@@ -411,7 +411,7 @@ exports.connect = (connectionString) ->
 	
 	class Maybe extends ModelObject
 
-		size: ->
+		getSize: ->
 		getList: ->
 			queryMany
 				text: "SELECT * FROM maybe ORDER BY last_edited;"
@@ -419,7 +419,7 @@ exports.connect = (connectionString) ->
 	
 	class Inbox extends ModelObject
 		
-		size: (callback) ->
+		getSize: (callback) ->
 			await queryOne
 				text: "SELECT count(*) FROM inbox;"
 				values: [],
@@ -436,7 +436,7 @@ exports.connect = (connectionString) ->
 	
 	class Urgent extends ModelObject
 
-		size: ->
+		getSize: ->
 		getList: ->
 
 	model =

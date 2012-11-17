@@ -12,7 +12,7 @@ class InboxView extends View
 		@newInfo()
 
 	drawTitle: ->
-		await @inbox.size defer error, size
+		await @inbox.getSize defer error, size
 		@viewslot.setTitle "Inbox (#{size})"
 
 	draw: ->
@@ -20,7 +20,7 @@ class InboxView extends View
 		@viewslot.setContent require("template/inbox").render()
 		new InboxDraggable @viewslot.getHeader()
 		@infoslot = new InboxViewSlot $("h1", @viewslot.getContentNode()), $(".inboxcontent", @viewslot.getContentNode())
-		await @inbox.size defer error, size
+		await @inbox.getSize defer error, size
 		if size is 0
 			$("a[href='#read']", @viewslot.getContentNode()).hide()
 		else

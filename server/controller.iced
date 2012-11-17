@@ -1,72 +1,67 @@
 exports.serve = (app, model) ->
-	classByType =
-		note: model.Note
-		
 
+	classByType = (type) ->
+		for name, class_ of model
+			return class_ if name.toLowerCase() == type
 
-	# TODO: one app.use get type, id, req.method optionally req.param.method to create an object and a method then call by method
-	app.get "/:type/:id", (req, res) ->
-		switch req.param "type"
-			when "inbox"
-				inbox = new (model.Inbox)
-				switch req.param "id"
-					when "first"
-						await inbox.getFirst defer error, firstinfo
-						if firstinfo?
-							await firstinfo.get defer error, answer
-						else
-							answer =
-								msg: "inbox is empty"
-					when "size"
-						await inbox.size defer error, size
-						answer =
-							size: size
-					else
-						answer = {}
-			else
-				info = new (model.Information) req.param "id"
-				type = req.param "type"
-				info.type = type unless type == "information"
-				switch req.param "filter"
-					when "type"
-						await info.getType defer error, type
-						answer =
-							type: type
-					else
-						await info.get defer error, answer
-		if error?
-			console.log error
-			res.send 500, error
-		else
-			res.send answer
-	
-	app.post "/:type", (req, res) ->
-		type = req.param "type"
-		answer =
-			msg: "Type not found."
-		switch type
-			when "note"
-				await new (model.Note)().create req.body.content, defer error, id
-				answer =
-					id: id
-		res.send answer
+	findGetter = (filter, object) ->
+		string = "get#{if filter? then filter else ''}".toLowerCase()
+		for name, getter of object
+			return getter if name.toLowerCase() == string
 
-	app.patch "/:type/:id", (req, res) ->
+	parse = (req, res) ->
+		httpmethod = req.method
 		type = req.param "type"
 		id = req.param "id"
-		method = req.body.method
-		
-		info = new (classByType[type])(id)
-		f = info[method]
-		switch f
+		return unless type?
+		console.log "#{httpmethod} /#{type}/#{id}"
+		object = new (classByType type)? id
+		switch httpmethod.toLowerCase()
+			when "get"
+				filter = req.param "filter"
+				method = findGetter filter, object
+			when "post"
+				method = object.create
+			when "patch"
+				method = object[req.body.method]
+		args = []
+		prep = (x, cb) -> cb null, if x? then x else {msg: "success"}
+		prepOnPost = (id, cb) -> cb null, {id: id}
+		switch method
+			when model.Information.prototype.getType
+				prep = (type, cb) -> cb null, {type: type}
 			when model.Information.prototype.setStatus
-				await f.call info, req.body.status, defer error
+				args.push req.body.status
 			when model.Information.prototype.addReference
-				await f.call info, new (model.Information)(req.body.reference), defer error
+				args.push new (model.Information) req.body.reference
 			when model.Information.prototype.setDelay
-				await f.call info, new Date(req.body.delay), defer error
+				args.push new Date(req.body.delay)
+			when model.Note.prototype.create
+				args.push req.body.content
+				prep = prepOnPost
+			when model.Inbox.prototype.getFirst
+				prep = (info, cb) ->
+					if info?
+						await info.get cb
+					else
+						cb null, {msg: "inbox is empty"}
+			when model.Inbox.prototype.getSize
+				prep = (size, cb) -> cb null, {size: size}
+			else
+				unless method in [model.Information.prototype.get]
+					error = {msg: "method not found"}
 		unless error?
-			res.send 200, {id: id}
+			await
+				args.push defer error, result
+				method.apply object, args
+		unless error?
+			await prep result, defer error, answer
+		unless error?
+			res.send 200, answer
 		else
-			res.send 500, {msg: "internale error"}
+			res.send 500, {msg: "Internal Error"}
 			console.log error
+		
+
+	app.all "/:type/:id", parse
+	app.all "/:type", parse
