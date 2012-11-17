@@ -13,11 +13,11 @@
 CREATE TYPE status AS ENUM ('delete', 'default', 'maybe', 'inbox', 'urgent');
 
 CREATE TABLE information(
-	id 			serial PRIMARY KEY
+	id 			serial PRIMARY KEY,
 	status 		status DEFAULT 'default' NOT NULL,
 	delay		timestamp,
 	last_edited timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	created_at 	timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	created_at 	timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE TABLE "references"(
@@ -32,25 +32,26 @@ CREATE TABLE "file"(
 );
 
 CREATE TABLE attachments(
-	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE
-	fileid 		integer PRIMARY KEY REFERENCES "file"(id) ON DELETE CASCADE
+	id 			integer REFERENCES information(id) ON DELETE CASCADE,
+	fileid 		integer REFERENCES "file"(id) ON DELETE CASCADE,
+	PRIMARY KEY (id, fileid)
 );
 
 CREATE TABLE note(
 	id			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
-	content 	varchar NOT NULL,
+	content 	varchar NOT NULL
 );
 
 CREATE TABLE task(
-	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE
+	id 			integer PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
 	description varchar NOT NULL,
-	completed 	timestamp,
+	completed 	timestamp
 );
 
 CREATE TABLE project(
-	id			integer PRIMARY KEY REFERENCES task(id) ON DELETE CASCADE
+	id			integer PRIMARY KEY REFERENCES task(id) ON DELETE CASCADE,
 	collapsed 	boolean DEFAULT false NOT NULL,
-	parent 		integer REFERENCES project(id),
+	parent 		integer REFERENCES project(id)
 );
 
 CREATE TABLE asaplist(
@@ -74,7 +75,7 @@ CREATE TABLE circle(
 );
 
 CREATE TABLE contact(
-	id 			integer PRIMARY KEY REFERENCES social_entity(id) ON DELETE CASCADE
+	id 			integer PRIMARY KEY REFERENCES social_entity(id) ON DELETE CASCADE,
 	name 		varchar,
 	first_name	varchar,
 	middle_names varchar,
@@ -157,7 +158,7 @@ CREATE TABLE protocol(
 CREATE TABLE server(
 	id 			serial PRIMARY KEY,
 	name 		varchar NOT NULL,
-	protocolid 	integer REFERENCES protocol(id) NOT NULL ON DELETE CASCADE,
+	protocolid 	integer REFERENCES protocol(id) ON DELETE CASCADE NOT NULL,
 	UNIQUE(name, protocolid)
 );
 
@@ -166,11 +167,11 @@ CREATE TABLE communicator(
 	default_status status DEFAULT 'inbox' NOT NULL,
 	username 	varchar NOT NULL,
 	name 		varchar,
-	serverid 	integer REFERENCES server(id) NOT NULL ON DELETE CASCADE
+	serverid 	integer REFERENCES server(id) ON DELETE CASCADE NOT NULL
 );
 
 CREATE TABLE account(
-	id 			integer PRIMARY KEY REFERENCES communicator(id) ON DELETE CASCADE,
+	id 			integer PRIMARY KEY REFERENCES communicator(id) ON DELETE CASCADE
 );
 
 CREATE TABLE accounts(
@@ -215,13 +216,13 @@ CREATE TABLE message(
 );
 	
 CREATE TABLE presence(
-	id 			integer PRIMARY KEY REFERENCES communication(id) ON DELETE CASCADE,
+	id 			integer PRIMARY KEY REFERENCES communication(id) ON DELETE CASCADE
 );
 
 CREATE TABLE resources(
-	presenceid 	integer PRIMARY KEY REFERENCES presence(id) ON DELETE CASCADE,
-	resourceid 	integer PRIMARY KEY REFERENCES "resource"(id) ON DELETE CASCADE,
-	PRIMARY KEY(presenceid, resourcid)
+	presenceid 	integer REFERENCES presence(id) ON DELETE CASCADE,
+	resourceid 	integer REFERENCES "resource"(id) ON DELETE CASCADE,
+	PRIMARY KEY(presenceid, resourceid)
 );
 
 CREATE TABLE header(
@@ -230,11 +231,11 @@ CREATE TABLE header(
 );
 
 CREATE TABLE outbox(
-	communicationid integer PRIMARY KEY REFERENCES message(id) ON DELETE CASCADE,
+	communicationid integer PRIMARY KEY REFERENCES message(id) ON DELETE CASCADE
 );
 
 CREATE TABLE draft(
-	communicationid integer PRIMARY KEY REFERENCES message(id) ON DELETE CASCADE,
+	communicationid integer PRIMARY KEY REFERENCES message(id) ON DELETE CASCADE
 );
 
 CREATE TYPE recipient_field AS ENUM('to', 'cc', 'bcc');
@@ -244,7 +245,7 @@ CREATE TABLE recipient(
 	accountid 	integer REFERENCES account(id) ON DELETE CASCADE,
 	field 		recipient_field,
 	"resource" 	varchar,
-	PRIMARY KEY(messagid, accountid, field)
+	PRIMARY KEY(messageid, accountid, field)
 );
 
 CREATE TABLE daemon(
@@ -272,24 +273,25 @@ CREATE TABLE useraccount(
 --  |-contact
 -- |-place
 
+DROP VIEW "type" CASCADE;
 CREATE VIEW "type" AS 
-			SELECT information.id, 'note' as "type" FROM information, note USING (id)
-	UNION	SELECT information.id, 'project' as "type" FROM information, project USING (id)
-	UNION	SELECT information.id, 'asap' as "type"  FROM information, asap USING (id)
-	UNION	SELECT information.id, 'appointment' as "type" FROM information, appointment USING (id)
-	UNION	SELECT information.id, 'circle' as "type" FROM information, circle USING (id)
-	UNION	SELECT information.id, 'contact' as "type" FROM information, contact USING (id)
-	UNION	SELECT information.id, 'place' as "type" FROM information, place USING (id);
+			SELECT information.id, 'note' as "type" FROM information JOIN note USING (id)
+	UNION	SELECT information.id, 'project' as "type" FROM information JOIN project USING (id)
+	UNION	SELECT information.id, 'asap' as "type"  FROM information JOIN asap USING (id)
+	UNION	SELECT information.id, 'appointment' as "type" FROM information JOIN appointment USING (id)
+	UNION	SELECT information.id, 'circle' as "type" FROM information JOIN circle USING (id)
+	UNION	SELECT information.id, 'contact' as "type" FROM information JOIN contact USING (id)
+	UNION	SELECT information.id, 'place' as "type" FROM information JOIN place USING (id);
 
 
 CREATE VIEW "infoview" AS
-	SELECT id, EXTRACT(EPOCH FROM created_at) AS created_at, EXTRACT(EPOCH FROM last_edited) AS last_edited, status, "type"
-		FROM information, "type" USING (id);
+	SELECT id, EXTRACT(EPOCH FROM created_at) AS created_at, EXTRACT(EPOCH FROM last_edited) AS last_edited, status, "type", delay
+		FROM information JOIN "type" USING (id);
 
 
 CREATE VIEW "inbox" AS
 	SELECT * 
-		FROM infoview WHERE status >= 'inbox' AND delay <= CURRENT_TIMESTAMP;
+		FROM infoview WHERE status >= 'inbox' AND (delay <= CURRENT_TIMESTAMP OR delay is NULL);
 
 
 CREATE VIEW "maybe" AS
@@ -314,13 +316,12 @@ CREATE VIEW projectview AS
 
 
 CREATE VIEW "appointmentview" AS
-	SELECT i.*, "date", time, length, description
+	SELECT i.*, startdate, enddate, time, length, description
 		FROM infoview i
 			INNER JOIN appointment USING (id);
 
 
 CREATE VIEW "noteview" AS
-	SELECT i.*, content, attachment, f.name AS attachmentname
+	SELECT i.*, content
 		FROM infoview i 
 			JOIN note n USING (id)
-			LEFT OUTER JOIN file f ON f.id = n.attachment;	

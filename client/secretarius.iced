@@ -8,6 +8,7 @@ window.model = require("clientmodel").connect()
 $ ->
 	$("body").html(require("template/body").render())
 	new (require("inbox").InboxDraggable)($("#menu > button:contains('Inbox')"))
+	new (require("create").CreateNoteDraggable)($("#menu > button:contains('New Note')"))
 	$("#menu").buttonset()
 	$("#menu > button").button()
 	$("#tabs").tabs()

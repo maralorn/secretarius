@@ -1,99 +1,111 @@
 {ModelObject} = require "basemodel"
 
-notImplemented = (errorcallback) ->
+notImplemented = () ->
 	alert("This Function is not implemented!")
-	errorcallback?("This Function is not implemented!")
 
 exports.connect = () ->
 	class PGObject extends ModelObject
 		constructor: (@id) ->
+				
+		_get: (data, callback, url)->
+			@_call "get", data, callback, url
+
+		_put: (data, callback, url) ->
+			@_call "put", data, callback, url
+		
+		_delete: (callback, url) ->
+			@_call "delete", callback, url
+
+		_patch: (data, callback, url) ->
+			@_call "patch", data, callback, url
+
+		_post: (data, callback, url) ->
+			@_call "post", data, callback, url
+
+		_call: (type, data, callback, url) ->
+			await
+				request =
+					url: if url? then url else @_url()
+					type: type
+					success: defer answer
+					dataType: "json"
+				if data? then request.data = data
+				console.log "#{type.toUpperCase()} #{request.url} (#{if data? then JSON.stringify data else ""})"
+				$.ajax(request)
+			callback null, answer
 
 	class Information extends PGObject
 		constructor: (@id) ->
 			tempType = @constructor.name.toLowerCase()
 			@type = tempType if tempType != "information"
 
-		create: (status = "default", referencing=null, callback, errorcallback) ->
-			notImplemented(errorcallback)
+		create: (status = "default", referencing=null, callback) ->
+			notImplemented()
 
-		addReference: (reference, callback, errorcallback) ->
+		addReference: (reference, callback) ->
 			@_patch
 				method: "addReference"
 				reference: reference.id,
-					callback, errorcallback
-		removeReference: (reference, callback, errorcallback) ->
+					callback
+		removeReference: (reference, callback) ->
 			@_patch
 				method: "removeReference"
 				reference: reference.id,
-					callback, errorcallback
+					callback
 			
-		delete: (callback, errorcallback) ->
-			@_delete callback, errorcallback
+		delete: (callback) ->
+			@_delete callback
 
-		getType: (callback, errorcallback) ->
+		getType: (callback) ->
 			unless @type?
 				await @_get
-					fields: ["type"],
-						defer({type: @type}), errorcallback
-			callback? @type
+					filter: "type",
+						defer error,{type: @type}
+			callback? error, @type
 			
 
 		get: (callback, errorcallback) ->
-			await @getType defer()
+			await @getType defer error
+			callback? error if error?
 			unless @values?
-				await @_get null, defer(@values), errorcallback
-				(@[key] = value) for key,value of @values
-			callback? @values
+				await @_get null, defer error, values
+				_set values
+			callback? error, @values
 
-		setStatus: (status, callback, errorcallback) ->
+		setStatus: (status, callback) ->
 			@_patch
 				method: "setStatus"
 				status: status,
-					callback, errorcallback
+					callback
 
-		setDelay: (delay, callback, errorcallback) ->
+		setDelay: (delay, callback) ->
 			@_patch
 				method: "setDelay"
 				delay: delay,
-					callback, errocallback
+					callback
 
-		attach: (file, callback, errorcallback) ->
+		attach: (file, callback) ->
 			@_patch
 				method: "attach"
 				file: file.id,
-					callback, errorcallback
+					callback
 
-		detach: (file, callback, errorcallback) ->
+		detach: (file, callback) ->
 			@_patch
 				method: "detach"
 				file: file.id,
-					callback, errorcallback
+					callback
 
-		getReferences: (callback, errorcallback) ->
+		getReferences: (callback) ->
 			@_get
-				fields: "references",
-					callback, errorcallback
-				
-		_get: (data, callback, errorcallback) ->
-			@_call "get", "#{@id}", data, callback, errorcallback
-		_put: (data, callback, errorcallback) ->
-			@_call "put", "#{@id}", data, callback, errorcallback
-		_delete: (callback, errorcallback) ->
-			@_call "delete", "#{@id}", callback, errorcallback
-		_patch: (data, callback, errorcallback) ->
-			@_call "patch", "#{@id}", data, callback, errorcallback
-		_post: (data) ->
-			@_call "post", null, data, callback, errorcallback
-		_call: (type, url, data, callback, errorcallback) ->
-			url = "#{@type}#{if url? then "/#{url}" else ""}"
-			request =
-				url: url
-				type: type
-				success: callback
-				dataType: "json"
-			if data? then request.data = data
-			console.log "#{type.toUpperCase()} #{url} (#{data})"
-			$.ajax(request)
+				filter: "references",
+					callback
+
+		_url: -> "#{@type}#{if @id? then "/#{@id}" else ""}"
+
+		_set: (values) ->
+				@values = values
+				(@[key] = value) for key,value of values
 
 	class File extends PGObject
 		create: (name) ->
@@ -101,15 +113,17 @@ exports.connect = () ->
 		delete: ->
 
 	class Note extends Information
-		create: (content, attachment=null) ->
-			{id: @id} = @_post
-				content: content
-				attachment: if attachment? then attachment.id else null
+		create: (content, callback) ->
+			await @_post
+				content: content,
+					defer error, {id: @id}
+			callback? error, @id
 
-		change: (content) ->
+		change: (content, callback) ->
 			@_patch
 				method: "change"
-				content: content
+				content: content,
+					callback
 
 	class Task extends Information
 		create: (description, referencing=null) ->
@@ -239,16 +253,25 @@ exports.connect = () ->
 		deregistrate: ->
 		@getAll: ->
 	
-	class Maybe extends ModelObject
+	class Maybe extends PGObject
 		size: ->
 		getList: ->
 	
-	class Inbox extends ModelObject
-		size: ->
-		getFirst: (callback, errorcallback) ->
-			callback new Note()
+	class Inbox extends PGObject
+		size: (callback) ->
+			await @_get null, defer(error, answer), "inbox/size"
+			callback? error, answer.size
 
-	class Urgent extends ModelObject
+		getFirst: (callback) ->
+			await @_get null, defer(error, answer), "inbox/first"
+			if answer.id?
+				info = new Information
+				info._set answer
+			else
+				info = null
+			callback? error, info
+
+	class Urgent extends PGObject
 		 size: ->
 		 getList: ->
 

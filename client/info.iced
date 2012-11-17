@@ -1,7 +1,9 @@
 {View, Draggable} = require("view")
 
 getViewByType = (type) ->
-	viewByType[type]
+	view = viewByType[type]
+	unless view? then console.log "Type not found: #{type}"
+	return view
 
 class InfoDraggable extends Draggable
 	constructor: (@DOMnode, @info) ->
@@ -12,7 +14,7 @@ class InfoDraggable extends Draggable
 
 exports.InfoView = class InfoView extends View
 	@create: (viewslot, info) ->
-		await info.getType defer(type)
+		await info.getType defer error, type
 		new (getViewByType type) viewslot, info
 		
 	constructor: (@viewslot, @info) ->
@@ -21,9 +23,9 @@ exports.InfoView = class InfoView extends View
 class NoteView extends InfoView
 	constructor: (@viewslot, @info) ->
 		super @viewslot, @info
-		await @info.get defer content
+		await @info.get defer()
 		@viewslot.setTitle "Note"
-		@viewslot.setContent content.content
+		@viewslot.setContent @info.content
 
 viewByType =
 	note: NoteView

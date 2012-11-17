@@ -1,33 +1,34 @@
 hash = do ->
-	crypto = require 'crypto'
-	(key) -> crypto.createHash('md5').update(key).digest 'base64'
+	crypto = require "crypto"
+	(key) -> crypto.createHash("md5").update(key).digest "base64"
 
 {ModelObject} = require "basemodel"
 
 exports.connect = (connectionString) ->
-	pg = require('pg').native
+	pg = require("pg")
 
-	query = (config, callback, errorcallback) ->
+	query = (config, callback) ->
 		config.name = hash config.text
 		await pg.connect connectionString, defer client
 		request = client.query config
-		request.on 'error', (error) -> errcb error
-		callback? request
+		request.on "error", (error) -> console.log "pgerror: #{JSON.stringify error}\nquery: #{JSON.stringify config}"
+		callback? null, request
 	
-	queryMany = (config, callback, errorcallback) ->
+	queryMany = (config, callback) ->
 		if config.callback?
 			cb = config.callback
 			delete config.callback
 		else
-			cb = (row, result) -> result.addRow(row)
-		await query(config, defer request, errorcallback)
-		request.on 'row', cb
-		await request.on 'end', defer result
-		callback result.rows
+			cb = (row, result) ->
+				result.addRow(row)
+		await query config, defer error, request
+		request.on "row", cb
+		await request.on "end", defer result
+		callback? error, result?.rows
 		
-	queryOne = (config, callback, errorcallback) ->
-		await queryMany config, defer result, errorcallback
-		callback result[0]
+	queryOne = (config, callback) ->
+		await queryMany config, defer error, result
+		callback? error, result?[0]
 
 	class PGObject extends ModelObject
 		constructor: (@id) ->
@@ -37,82 +38,86 @@ exports.connect = (connectionString) ->
 
 		constructor: (@id) ->
 			tempType = @constructor.name.toLowerCase()
-			@type = tempType if tempType != 'information'
+			@type = tempType if tempType != "information"
 			
-		create: (status = 'default', referencing=null, callback, errorcallback) ->
+		create: (status = "default", referencing=null, callback) ->
 			await queryOne
-				text: 'INSERT INTO information (status) VALUES ($1) RETURNING id;'
+				text: "INSERT INTO information (status) VALUES ($1) RETURNING id;"
 				values: [status],
-					defer {id: @id}, errorcallback
+					defer error, {id: @id}
 			@addReference referencing if referencing?
-			callback? @id
+			callback? error, @id
 
-		addReference: (reference, callback, errorcallback) ->
+		addReference: (reference, callback) ->
 			query
-				text: 'INSERT INTO "references" (id, referenceid) VALUES ($1, $2);'
+				text: "INSERT INTO references (id, referenceid) VALUES ($1, $2);"
 				values: [@id, reference.id],
-					callback, errorcallback
+					callback
 
-		removeReference: (reference, callback, errorcallback) ->
+		removeReference: (reference, callback) ->
 			query
-				text: 'DELETE FROM references WHERE id=$1 AND referenceid=$2'
+				text: "DELETE FROM references WHERE id=$1 AND referenceid=$2"
 				values: [@id, reference.id],
-					callback, errorcallback
+					callback
 
-		delete: (callback, errorcallback) ->
+		delete: (callback) ->
 			query
-				text: 'DELETE FROM information WHERE id=$1;'
+				text: "DELETE FROM information WHERE id=$1;"
 				values: [@id],
-					callback, errorcallback
+					callback
 
-		getType: (callback, errorcallback) ->
+		getType: (callback) ->
 			unless @type
 				await queryOne
-					text: 'SELECT type FROM type WHERE id=$1;'
+					text: "SELECT type FROM type WHERE id=$1;"
 					values: [@id],
-						defer({type: @type}), errorcallback
-			callback? @type
+						defer error, {type: @type}
+			callback? error, @type
 
-		get: (callback, errorcallback) ->
-			await @getType defer()
+		get: (callback) ->
+			await @getType defer error
+			callback? error if error?
 			await queryOne
-				text: 'SELECT * FROM #{@type}view WHERE id=$1;'
+				text: "SELECT * FROM #{@type}view WHERE id=$1;"
 				values: [@id],
-					defer(answer), errorcallback
+					defer error, answer
 			(@[key] = value) for key,value of answer
-			callback answer
+			callback error, answer
 
-		setStatus: (status, callback, errorcallback) ->
+		setStatus: (status, callback) ->
 			query
-				text: 'UPDATE information SET status=$2 WHERE id=$1;'
+				text: "UPDATE information SET status=$2 WHERE id=$1;"
 				values: [@id, status],
-					callback, errorcallback
+					callback
 
-		setDelay: (delay, callback, errorcallback) ->
+		setDelay: (delay, callback) ->
 			query
-				text: 'UPDATE information SET status="inbox", delay=$2 WHERE id=$1;'
+				text: "UPDATE information SET status='inbox', delay=$2 WHERE id=$1;"
 				values: [@id, delay],
-					callback, errorcallback
+					callback
 
-		attach: (file, callback, errorcallback) ->
+		attach: (file, callback) ->
 			query
-				text: 'INSERT INTO "attachments" (id, fileid) VALUES ($1, $2)'
+				text: "INSERT INTO attachments (id, fileid) VALUES ($1, $2)"
 				values: [@id, file.id],
-					callback, errorcallback
+					callback
 
-		detach: (file, callback, errorcallback) ->
+		detach: (file, callback) ->
 			query
-				text: 'DELETE FROM "attachments" WHERE id=$1 AND fileid=$2)'
+				text: "DELETE FROM attachments WHERE id=$1 AND fileid=$2)"
 				values: [@id, file.id],
-					callback, errorcallback
+					callback
 
-		_set: (table, map, allowed, callback, errorcallback) ->
-			for key, value of map
+		_set: (table, map, allowed, callback) ->
+			answers = {}
+			errors = {}
+			await for key, value of map
 				if not allowed? or key in allowed
 					query
-						text: 'UPDATE #{table} SET $2=$3 WHERE id=$1;'
+						text: "UPDATE #{table} SET $2=$3 WHERE id=$1;"
 						values: [@id, key, value],
-							callback, errorcallback
+							defer errors[key], answers[key]
+			callback? errors, answers
 
 		getReferences: ->
 
@@ -121,56 +126,56 @@ exports.connect = (connectionString) ->
 
 		create: (name) ->
 			{id: @id} = queryOne
-				text: 'INSERT INTO file (name) VALUES ($1) RETURNING id;'
+				text: "INSERT INTO file (name) VALUES ($1) RETURNING id;"
 				values: [name]
 			@id
 			
 		getName: ->
 			answer = queryOne
-				text: 'SELECT name FROM file WHERE id=$1;'
+				text: "SELECT name FROM file WHERE id=$1;"
 				values: [@id]
 			answer.name
 
 		delete: ->
 			query
-				text: 'DELETE FROM file WHERE id=$1'
+				text: "DELETE FROM file WHERE id=$1"
 				values: [@id]
 
 
 	class Note extends Information
 
-		create: (content, attachment=null, callback, errorcallback) ->
-			await super defer(id), errorcallback
+		create: (content, callback) ->
+			await super "inbox", null, defer error
+			callback? error if error?
 			await queryOne
-				text: 'INSERT INTO note (id, content, attachment) VALUES ($1, $2, $3);'
-				values: [@id, content, attachment],
-					defer(id), errorcallback
-			callback? id
-
-		change: (content, callback, errorcallback) ->
-			query
-				text: 'UPDATE note SET content=$2 WHERE id=$1'
+				text: "INSERT INTO note (id, content) VALUES ($1, $2);"
 				values: [@id, content],
-					callback, errorcallback
+					callback
+
+		change: (content, callback) ->
+			query
+				text: "UPDATE note SET content=$2 WHERE id=$1"
+				values: [@id, content],
+					callback
 
 
 	class Task extends Information
 
 		create: (description, referencing=null) ->
-			super 'default', referencing
+			super "default", referencing
 			queryOne
-				text: 'INSERT INTO task (id, description) VALUES ($1, $2);'
+				text: "INSERT INTO task (id, description) VALUES ($1, $2);"
 				values: [@id, description]
 			@id
 
 		done: ->
 			query
-				text: 'UPDATE task SET completed=CURRENT_TIMESTAMP WHERE id=$1'
+				text: "UPDATE task SET completed=CURRENT_TIMESTAMP WHERE id=$1"
 				values: [@id]
 
 		undo: ->
 			query
-				text: 'UPDATE task SET completed=NULL WHERE id=$1'
+				text: "UPDATE task SET completed=NULL WHERE id=$1"
 				values: [@id]
 
 	class Project extends Task
@@ -178,28 +183,28 @@ exports.connect = (connectionString) ->
 		create: (description, referencing=null, parent=null) ->
 			super description, referencing
 			queryOne
-				text: 'INSERT INTO project (id, parent) VALUES ($1, $2);'
+				text: "INSERT INTO project (id, parent) VALUES ($1, $2);"
 				values: [@id, parent]
 			@id
 
 		setParent: (parent) ->
 			query
-				text: 'UPDATE project SET parent=$2 WHERE id=$1;'
+				text: "UPDATE project SET parent=$2 WHERE id=$1;"
 				values: [@id, if parent? then parent.id else null]
 
 		collapse: ->
 			query
-				text: 'UPDATE project SET collapsed=TRUE WHERE id=$1;'
+				text: "UPDATE project SET collapsed=TRUE WHERE id=$1;"
 				values: [@id]
 
 		uncollapse: ->
 			query
-				text: 'UPDATE project SET collapsed=FALSE WHERE id=$1;'
+				text: "UPDATE project SET collapsed=FALSE WHERE id=$1;"
 				values: [@id]
 
 		@getAll: () ->
 			queryMany
-				text: 'SELECT * FROM projectview WHERE completed IS NULL;'
+				text: "SELECT * FROM projectview WHERE completed IS NULL;"
 				values: []
 
 
@@ -208,28 +213,28 @@ exports.connect = (connectionString) ->
 		create: (description, list, referencing=null, project=null) ->
 			super description, referencing
 			queryOne
-				text: 'INSERT INTO asap (id, asaplist, project) VALUES ($1, (SELECT id FROM asaplist WHERE name=$2), $3);'
+				text: "INSERT INTO asap (id, asaplist, project) VALUES ($1, (SELECT id FROM asaplist WHERE name=$2), $3);"
 				values: [@id, list, project]
 			@id
 
 		setProject: (project) ->
 			query
-				text: 'UPDATE asap SET project=$2 WHERE id=$1;'
+				text: "UPDATE asap SET project=$2 WHERE id=$1;"
 				values: [@id, project]
 
 		setList: (list) ->
 			query
-				text: 'UPDATE asap AS a SET asaplist=l.id FROM asaplist l WHERE l.name=$2 AND a.id=$1;'
+				text: "UPDATE asap AS a SET asaplist=l.id FROM asaplist l WHERE l.name=$2 AND a.id=$1;"
 				values: [@id, list]
 
 		@getAllFromList: (list) ->
 			queryMany
-				text: 'SELECT a.* FROM asapview a WHERE a.asaplist=$1 AND completed IS NULL;'
+				text: "SELECT a.* FROM asapview a WHERE a.asaplist=$1 AND completed IS NULL;"
 				values: [list]
 
 		@getAll: () ->
 			queryMany
-				text: 'SELECT * FROM asapview WHERE completed IS NULL;'
+				text: "SELECT * FROM asapview WHERE completed IS NULL;"
 				values: []
 
 
@@ -237,29 +242,29 @@ exports.connect = (connectionString) ->
 
 		create: (name) ->
 			{id: @id} = queryOne
-				text: 'INSERT INTO asaplist (name) VALUES ($1) RETURNING id;'
+				text: "INSERT INTO asaplist (name) VALUES ($1) RETURNING id;"
 				values: [name]
 			@id
 
 		rename: (name) ->
 			query
-				text: 'UPDATE asaplist SET name=$2 WHERE id=$1;'
+				text: "UPDATE asaplist SET name=$2 WHERE id=$1;"
 				values: [@id, name]
 
 		delete: ->
 			query
-				text: 'DELETE FROM asaplist WHERE id=$1;'
+				text: "DELETE FROM asaplist WHERE id=$1;"
 				values: [@id]
 
 		@getByName: (name) =>
 			answer = queryOne
-				text: 'SELECT id FROM asaplist WHERE name=$1;'
+				text: "SELECT id FROM asaplist WHERE name=$1;"
 				values: [name]
 			new @ answer.id
 
 		@getAll: ->
 			queryMany
-				text: 'SELECT id, name FROM asaplist;'
+				text: "SELECT id, name FROM asaplist;"
 				values: []
 
 	class SocialEntity extends Information
@@ -267,7 +272,7 @@ exports.connect = (connectionString) ->
 		create: ->
 			super()
 			queryOne
-				text: 'INSERT INTO social_entity (id) VALUES ($1);'
+				text: "INSERT INTO social_entity (id) VALUES ($1);"
 				values: [@id]
 			@id
 			
@@ -276,19 +281,19 @@ exports.connect = (connectionString) ->
 		create: (name) ->
 			super()
 			queryOne
-				text: 'INSERT INTO circle (id, name) VALUES ($1, $2);'
+				text: "INSERT INTO circle (id, name) VALUES ($1, $2);"
 				values: [@id, name]
 			@id
 
 		@getByName: (name) =>
 			answer = queryOne
-				text: 'SELECT id FROM circle WHERE name=$1;'
+				text: "SELECT id FROM circle WHERE name=$1;"
 				values: [name]
 			new @ answer.id
 
 		rename: (name) ->
 			queryOne
-				text: 'UPDATE circle SET name=$2 WHERE id=$1;'
+				text: "UPDATE circle SET name=$2 WHERE id=$1;"
 				values: [@id, name]
 
 	class Contact extends SocialEntity
@@ -296,13 +301,13 @@ exports.connect = (connectionString) ->
 		create: (nameMap) ->
 			super()
 			queryOne
-				text: 'INSERT INTO contact (id) VALUES ($1);'
+				text: "INSERT INTO contact (id) VALUES ($1);"
 				values: [@id]
 			setValues nameMap
 			@id
 
 		setValues: (nameMap) ->
-			@_set 'contact', nameMap, ['name', 'first_name', 'middle_names', 'title', 'prefix', 'suffix', 'nickname', 'birthname', 'birthday']
+			@_set "contact", nameMap, ["name", "first_name", "middle_names", "title", "prefix", "suffix", "nickname", "birthname", "birthday"]
 
 		addAccount: (account, description=null, priority=0) ->
 
@@ -324,9 +329,9 @@ exports.connect = (connectionString) ->
 	class Appointment extends Information
 
 		create: (description, date, time=null, length=null, referencing=null) ->
-			super 'default', referencing
+			super "default", referencing
 			queryOne
-				text: 'INSERT INTO appointment (id, description, startdate, enddate, time, length) VALUES ($1, $2, $3, $4, $5, $6);'
+				text: "INSERT INTO appointment (id, description, startdate, enddate, time, length) VALUES ($1, $2, $3, $4, $5, $6);"
 				values: [@id, description, date, date, time, length]
 			@id
 
@@ -334,7 +339,7 @@ exports.connect = (connectionString) ->
 		
 		setPlace: (place) ->
 
-		addException: (appointment, exceptionMove='no') ->
+		addException: (appointment, exceptionMove="no") ->
 		removeException: (appointment) ->
 
 		addFilter: (type, value) ->
@@ -408,21 +413,25 @@ exports.connect = (connectionString) ->
 		size: ->
 		getList: ->
 			queryMany
-				text: 'SELECT * FROM maybe ORDER BY last_edited;'
+				text: "SELECT * FROM maybe ORDER BY last_edited;"
 				values: []
 	
 	class Inbox extends ModelObject
 		
-		size: ->
-			answer = queryOne
-				text: 'SELECT count(*) FROM inbox;'
-				value: []
-			answer.count
+		size: (callback) ->
+			await queryOne
+				text: "SELECT count(*) FROM inbox;"
+				values: [],
+					defer error, answer
+			callback? error, answer?.count
 
-		getFirst: ->
-			queryOne
-				text: 'SELECT id, type FROM inbox ORDER BY created_at LIMIT 1;'
-				values: []
+		getFirst: (callback) ->
+			await queryOne
+				text: "SELECT id, type FROM inbox ORDER BY created_at LIMIT 1;"
+				values: [],
+					defer error, answer
+			callback? error, if answer?.id? then new Information answer.id else null
+
 	
 	class Urgent extends ModelObject
 

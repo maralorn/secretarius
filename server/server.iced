@@ -1,6 +1,6 @@
 fs = require "fs"
 
-connectionString = "maralorn:bla@blub.de"
+connectionString = "postgresql:///#{process.env.USER}-secretarius"
 debug = true
 clientdir = "#{__dirname}/../client"
 bothdir = "#{__dirname}/../both"
@@ -24,6 +24,7 @@ htmlcache = csscache = jscache = null
 app = (express = require "express")()
 	
 app.use express.static "client/static"
+app.use express.bodyParser()
 
 app.get "/", (req, res) ->
 	unless htmlcache? and not debug

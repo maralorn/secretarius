@@ -9,10 +9,11 @@ class InboxViewSlot extends ViewSlot
 class InboxView extends View
 	constructor: (@viewslot) ->
 		@inbox = new (window.model.Inbox)
-		@draw()
+		@newInfo()
 
 	drawTitle: ->
-		@viewslot.setTitle "Inbox (#{@inbox.size()})"
+		await @inbox.size defer error, size
+		@viewslot.setTitle "Inbox (#{size})"
 
 	draw: ->
 		@drawTitle()
@@ -21,15 +22,21 @@ class InboxView extends View
 		@infoslot = new InboxViewSlot $("h1", @viewslot.getContentNode()), $(".inboxcontent", @viewslot.getContentNode())
 		$(".buttons", @viewslot.getContentNode()).buttonset()
 		$(".buttons", @viewslot.getContentNode()).buttonset()
-		$("a[href='#read']", @viewslot.getContentNode()).click =>
-#			@info?.setStatus("default")
-			@newInfo()
-			false
-		@newInfo()
+		await @inbox.size defer error, size
+		if size is 0
+			$("a[href='#read']", @viewslot.getContentNode()).hide()
+		else
+			$("a[href='#read']", @viewslot.getContentNode()).click =>
+				await @info?.setStatus "default", defer error
+				alert error if error?
+				@newInfo()
+				false
 	
 	newInfo: ->
-		await @inbox.getFirst defer @info
-		InfoView.create @infoslot, @info
+		@draw()
+		await @inbox.getFirst defer error, @info
+		if @info?
+			InfoView.create @infoslot, @info
 
 exports.InboxDraggable = class InboxDraggable extends Draggable
 
