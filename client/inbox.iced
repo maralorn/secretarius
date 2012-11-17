@@ -20,8 +20,6 @@ class InboxView extends View
 		@viewslot.setContent require("template/inbox").render()
 		new InboxDraggable @viewslot.getHeader()
 		@infoslot = new InboxViewSlot $("h1", @viewslot.getContentNode()), $(".inboxcontent", @viewslot.getContentNode())
-		$(".buttons", @viewslot.getContentNode()).buttonset()
-		$(".buttons", @viewslot.getContentNode()).buttonset()
 		await @inbox.size defer error, size
 		if size is 0
 			$("a[href='#read']", @viewslot.getContentNode()).hide()

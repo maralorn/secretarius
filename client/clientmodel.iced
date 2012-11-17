@@ -32,7 +32,7 @@ exports.connect = () ->
 				if data? then request.data = data
 				console.log "#{type.toUpperCase()} #{request.url} (#{if data? then JSON.stringify data else ""})"
 				$.ajax(request)
-			callback null, answer
+			callback? null, answer
 
 	class Information extends PGObject
 		constructor: (@id) ->
@@ -69,7 +69,7 @@ exports.connect = () ->
 			callback? error if error?
 			unless @values?
 				await @_get null, defer error, values
-				_set values
+				@_set values
 			callback? error, @values
 
 		setStatus: (status, callback) ->

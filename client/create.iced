@@ -1,4 +1,5 @@
 {View, Draggable} = require "view"
+{InfoView} = require "info"
 
 exports.CreateNoteDraggable = class CreateNoteDraggable extends Draggable
 	createView: (viewslot) ->
@@ -12,7 +13,11 @@ class CreateNoteView extends CreateView
 		new CreateNoteDraggable @viewslot.getHeader()
 		@viewslot.setTitle "New Note"
 		@viewslot.setContent require("template/createnote").render()
+		slot = @viewslot
 		$("form.createnote", @viewslot.getContentNode()).submit (event) ->
-			note = new (model.Note)
-			note.create $("input[type='text']", @).val()
+			content = $("input[type='text']", @).val()
+			if content != ""
+				note = new (model.Note)
+				note.create content, ->
+					InfoView.create slot, note
 			false

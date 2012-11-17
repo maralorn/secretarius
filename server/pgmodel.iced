@@ -50,13 +50,13 @@ exports.connect = (connectionString) ->
 
 		addReference: (reference, callback) ->
 			query
-				text: "INSERT INTO references (id, referenceid) VALUES ($1, $2);"
+				text: "INSERT INTO \"references\" (id, referenceid) VALUES ($1, $2);"
 				values: [@id, reference.id],
 					callback
 
 		removeReference: (reference, callback) ->
 			query
-				text: "DELETE FROM references WHERE id=$1 AND referenceid=$2"
+				text: "DELETE FROM \"references\" WHERE id=$1 AND referenceid=$2"
 				values: [@id, reference.id],
 					callback
 
@@ -93,18 +93,18 @@ exports.connect = (connectionString) ->
 		setDelay: (delay, callback) ->
 			query
 				text: "UPDATE information SET status='inbox', delay=$2 WHERE id=$1;"
-				values: [@id, delay],
+				values: [@id, delay.toISOString()],
 					callback
 
 		attach: (file, callback) ->
 			query
-				text: "INSERT INTO attachments (id, fileid) VALUES ($1, $2)"
+				text: "INSERT INTO attachments (id, fileid) VALUES ($1, $2);"
 				values: [@id, file.id],
 					callback
 
 		detach: (file, callback) ->
 			query
-				text: "DELETE FROM attachments WHERE id=$1 AND fileid=$2)"
+				text: "DELETE FROM attachments WHERE id=$1 AND fileid=$2);"
 				values: [@id, file.id],
 					callback
 
@@ -150,7 +150,8 @@ exports.connect = (connectionString) ->
 			await queryOne
 				text: "INSERT INTO note (id, content) VALUES ($1, $2);"
 				values: [@id, content],
-					callback
+					defer error
+			callback? error, @id
 
 		change: (content, callback) ->
 			query

@@ -1,0 +1,19 @@
+.setStatus
+	button.default Normal
+	button.maybe Maybe
+	button.inbox Inbox
+	button.urgent Urgent
+form.delay
+	input(type="text", size="10").date
+	input(type="text", size="2", value="00").hour
+	| :
+	input(type="text", size="2", value="00").minute
+	input(type="submit", value="Delay")
+.infocontent
+.attachments
+	h2 Attachments
+	form
+		input(type="file")
+		input(type="submit", value="Upload File")
+.references
+	h2 References

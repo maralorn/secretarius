@@ -1,4 +1,10 @@
 exports.serve = (app, model) ->
+	classByType =
+		note: model.Note
+		
+
+
+	# TODO: one app.use get type, id, req.method optionally req.param.method to create an object and a method then call by method
 	app.get "/:type/:id", (req, res) ->
 		switch req.param "type"
 			when "inbox"
@@ -49,7 +55,18 @@ exports.serve = (app, model) ->
 		type = req.param "type"
 		id = req.param "id"
 		method = req.body.method
-		switch method
-			when "setStatus"
-				new (model.Information)(id).setStatus req.body.status
-		res.send 200, {id: id}
+		
+		info = new (classByType[type])(id)
+		f = info[method]
+		switch f
+			when model.Information.prototype.setStatus
+				await f.call info, req.body.status, defer error
+			when model.Information.prototype.addReference
+				await f.call info, new (model.Information)(req.body.reference), defer error
+			when model.Information.prototype.setDelay
+				await f.call info, new Date(req.body.delay), defer error
+		unless error?
+			res.send 200, {id: id}
+		else
+			res.send 500, {msg: "internale error"}
+			console.log error
