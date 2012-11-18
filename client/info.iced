@@ -5,6 +5,11 @@ getViewByType = (type) ->
 	unless view? then console.log "Type not found: #{type}"
 	return view
 
+infolabel = (info) ->
+	switch info.type
+		when "note"
+			return {infolabel: "Note: #{info.content}"}
+
 class InfoDraggable extends Draggable
 	constructor: (@DOMnode, @info) ->
 		super(@DOMnode)
@@ -22,6 +27,13 @@ exports.InfoView = class InfoView extends View
 		
 	constructor: (@viewslot, @info) ->
 		new InfoDraggable @viewslot.getHeader(), @info
+		@draw()
+		@info.onChanged => @draw()
+
+	draw: ->
+		await @info.get defer()
+		@viewslot.setTitle @title()
+		@drawContent()
 	
 	drawContent: ->
 		@viewslot.setContent require("template/infoframe").render()
@@ -39,9 +51,16 @@ exports.InfoView = class InfoView extends View
 				hour = $(".hour", @).val()
 				date = new Date(year, parseInt(month)-1, day, parseInt(hour)+1, min)
 				info.setDelay date
-				alert date
-			false
+			return false
 		$(".infocontent", context).html @content()
+		references = []
+		await for referenceid in @info.references
+			references.push reference = new (model.Information) referenceid
+			reference.get defer error
+		for reference in references
+			domnode = $(require("template/infolabel").render infolabel reference)
+			domnode.appendTo $(".references", context)
+			new InfoDraggable domnode, reference
 		$(".references", context).droppable
 			drop: (event, ui) =>
 				info = ui.draggable.data("dragobject").getInformation()
@@ -49,11 +68,8 @@ exports.InfoView = class InfoView extends View
 					@info.addReference info
 
 class NoteView extends InfoView
-	constructor: (@viewslot, @info) ->
-		super @viewslot, @info
-		await @info.get defer()
-		@viewslot.setTitle "Note"
-		@drawContent()
+	title: ->
+		"Note"
 	
 	content: ->
 		@info.content

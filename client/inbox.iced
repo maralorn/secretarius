@@ -8,7 +8,8 @@ class InboxViewSlot extends ViewSlot
 
 class InboxView extends View
 	constructor: (@viewslot) ->
-		@inbox = new (window.model.Inbox)
+		@inbox = window.model.inbox
+		@inbox.onChanged => @newInfo()
 		@newInfo()
 
 	drawTitle: ->
@@ -25,11 +26,8 @@ class InboxView extends View
 			$("a[href='#read']", @viewslot.getContentNode()).hide()
 		else
 			$("a[href='#read']", @viewslot.getContentNode()).click =>
-				await @info?.setStatus "default", defer error
-				alert error if error?
-				@newInfo()
-				false
-	
+				@info?.setStatus "default"
+				return false
 	newInfo: ->
 		@draw()
 		await @inbox.getFirst defer error, @info

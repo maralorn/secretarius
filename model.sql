@@ -324,4 +324,34 @@ CREATE VIEW "appointmentview" AS
 CREATE VIEW "noteview" AS
 	SELECT i.*, content
 		FROM infoview i 
-			JOIN note n USING (id)
+			JOIN note n USING (id);
+
+CREATE EXTENSION plpythonu;
+DROP FUNCTION set_timestamp() CASCADE;
+CREATE FUNCTION set_timestamp() RETURNS trigger AS $$
+	id = TD["new"]["id"]
+	plpy.execute("UPDATE information SET last_edited=CURRENT_TIMESTAMP WHERE id="+str(id)+";")
+	return "OK";
+$$ LANGUAGE plpythonu;
+
+CREATE TRIGGER infochange AFTER UPDATE ON information FOR EACH ROW WHEN (OLD.last_edited = NEW.last_edited) EXECUTE PROCEDURE set_timestamp();
+
+CREATE TRIGGER notechange AFTER UPDATE ON note FOR EACH ROW EXECUTE PROCEDURE set_timestamp();
+CREATE TRIGGER referenceschange AFTER INSERT ON "references" FOR EACH ROW EXECUTE PROCEDURE set_timestamp();
+
+DROP FUNCTION inboxchange() CASCADE;
+CREATE FUNCTION inboxchange() RETURNS trigger AS $$
+	plpy.execute("NOTIFY inboxchange;")
+	return "OK";
+$$ LANGUAGE plpythonu;
+CREATE TRIGGER inboxchange AFTER UPDATE ON information FOR EACH ROW WHEN (OLD.status != NEW.status) EXECUTE PROCEDURE inboxchange();
+CREATE TRIGGER inboxinsert AFTER INSERT ON information FOR EACH ROW EXECUTE PROCEDURE inboxchange();
+
+DROP FUNCTION notify_on_change() CASCADE;
+CREATE FUNCTION notify_on_change() RETURNS trigger AS $$
+	id = TD["new"]["id"]
+	plpy.execute("NOTIFY infochange, '"+str(id)+"';")
+	return "OK";
+$$ LANGUAGE plpythonu;
+
+CREATE TRIGGER infonotify AFTER UPDATE ON information FOR EACH ROW WHEN (OLD.last_edited != NEW.last_edited) EXECUTE PROCEDURE notify_on_change();

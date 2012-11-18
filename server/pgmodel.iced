@@ -6,12 +6,23 @@ hash = do ->
 
 exports.connect = (connectionString) ->
 	pg = require("pg")
+	
+	listen = (channel, callback, finishcallback) ->
+		client = new (pg.Client) connectionString
+		await client.connect defer()
+		client.on "notification", (msg) -> callback null, msg
+		client.query "LISTEN #{channel};"
+		finishcallback -> client.end()
 
 	query = (config, callback) ->
 		config.name = hash config.text
 		await pg.connect connectionString, defer client
 		request = client.query config
-		request.on "error", (error) -> console.log "pgerror: #{JSON.stringify error}\nquery: #{JSON.stringify config}"
+		request.on "error", (error) ->
+			request.error =
+				msg: "pgerror"
+				pgerror: error
+				query: config
 		callback? null, request
 	
 	queryMany = (config, callback) ->
@@ -24,11 +35,16 @@ exports.connect = (connectionString) ->
 		await query config, defer error, request
 		request.on "row", cb
 		await request.on "end", defer result
+		error = request.error if request.error?
 		callback? error, result?.rows
 		
 	queryOne = (config, callback) ->
 		await queryMany config, defer error, result
 		callback? error, result?[0]
+	
+	queryNone = (config, callback) ->
+		await queryMany config, defer error, result
+		callback? error, {msg: "succes"}
 
 	class PGObject extends ModelObject
 		constructor: (@id) ->
@@ -49,19 +65,19 @@ exports.connect = (connectionString) ->
 			callback? error, @id
 
 		addReference: (reference, callback) ->
-			query
+			queryNone
 				text: "INSERT INTO \"references\" (id, referenceid) VALUES ($1, $2);"
 				values: [@id, reference.id],
 					callback
 
 		removeReference: (reference, callback) ->
-			query
+			queryNone
 				text: "DELETE FROM \"references\" WHERE id=$1 AND referenceid=$2"
 				values: [@id, reference.id],
 					callback
 
 		delete: (callback) ->
-			query
+			queryNone
 				text: "DELETE FROM information WHERE id=$1;"
 				values: [@id],
 					callback
@@ -81,29 +97,33 @@ exports.connect = (connectionString) ->
 				text: "SELECT * FROM #{@type}view WHERE id=$1;"
 				values: [@id],
 					defer error, answer
+			await @getReferences defer error, references
+			answer.references = references
+			await @getAttachments defer error, attachments
+			answer.attachments = attachments
 			(@[key] = value) for key,value of answer
 			callback error, answer
 
 		setStatus: (status, callback) ->
-			query
+			queryNone
 				text: "UPDATE information SET status=$2 WHERE id=$1;"
 				values: [@id, status],
 					callback
 
 		setDelay: (delay, callback) ->
-			query
+			queryNone
 				text: "UPDATE information SET status='inbox', delay=$2 WHERE id=$1;"
 				values: [@id, delay.toISOString()],
 					callback
 
 		attach: (file, callback) ->
-			query
+			queryNone
 				text: "INSERT INTO attachments (id, fileid) VALUES ($1, $2);"
 				values: [@id, file.id],
 					callback
 
 		detach: (file, callback) ->
-			query
+			queryNone
 				text: "DELETE FROM attachments WHERE id=$1 AND fileid=$2);"
 				values: [@id, file.id],
 					callback
@@ -119,7 +139,19 @@ exports.connect = (connectionString) ->
 							defer errors[key], answers[key]
 			callback? errors, answers
 
-		getReferences: ->
+		getReferences: (callback) ->
+			await queryMany
+				text: "SELECT referenceid FROM \"references\" WHERE id=$1;"
+				values: [@id],
+					defer error, result
+			callback? error, (row.referenceid for row in result)
+
+		getAttachments: (callback) ->
+			await queryMany
+				text: "SELECT fileid FROM attachments WHERE id=$1;"
+				values: [@id],
+					defer error, result
+			callback? error, (row.fileid for row in result)
 
 
 	class File extends PGObject
@@ -153,7 +185,7 @@ exports.connect = (connectionString) ->
 					defer error
 			callback? error, @id
 
-		change: (content, callback) ->
+		setContent: (content, callback) ->
 			query
 				text: "UPDATE note SET content=$2 WHERE id=$1"
 				values: [@id, content],
@@ -460,3 +492,4 @@ exports.connect = (connectionString) ->
 		Inbox:Inbox
 		Maybe:Maybe
 		Urgent:Urgent
+		listen: listen

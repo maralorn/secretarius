@@ -14,7 +14,7 @@ exports.serve = (app, model) ->
 		type = req.param "type"
 		id = req.param "id"
 		return unless type?
-		console.log "#{httpmethod} /#{type}/#{id}"
+		console.log "#{httpmethod} /#{type}#{if id? then "/#{id}" else ""}"
 		object = new (classByType type)? id
 		switch httpmethod.toLowerCase()
 			when "get"
@@ -54,6 +54,8 @@ exports.serve = (app, model) ->
 			await
 				args.push defer error, result
 				method.apply object, args
+		if error? and error.pgerror? and error.pgerror.code in ["23505"]
+			error = null
 		unless error?
 			await prep result, defer error, answer
 		unless error?
@@ -62,6 +64,36 @@ exports.serve = (app, model) ->
 			res.send 500, {msg: "Internal Error"}
 			console.log error
 		
+	app.get "/information/update", (req, res) ->
+		req.socket.setTimeout Infinity
+		messageCount = 0
+
+		changecb = (error, msg) ->
+			messageCount++
+			res.write "id: #{messageCount}\n"
+			res.write "data: #{msg.payload}\n"
+			res.write "event: change\n\n"
+			console.log "infochange"
+
+		inboxcb = (error, msg) ->
+			messageCount++
+			res.write "id: #{messageCount}\n"
+			res.write "data: change\n"
+			res.write "event: inboxchange\n\n"
+			console.log "inboxchange"
+
+		await
+			model.listen "infochange", changecb, defer finishinfo
+			model.listen "inboxchange", inboxcb, defer finishinbox
+
+		res.writeHead 200,
+			"Content-Type": "text/event-stream"
+			"Cache-Control": "no-cache"
+			"Connection": "keep-alive"
+		res.write "\n"
+		req.on "close", ->
+			finishinfo()
+			finishinbox()
 
 	app.all "/:type/:id", parse
 	app.all "/:type", parse

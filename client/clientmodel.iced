@@ -4,6 +4,31 @@ notImplemented = () ->
 	alert("This Function is not implemented!")
 
 exports.connect = () ->
+
+	infos = {}
+
+	registerInfo = (info) ->
+		if info.id?
+			infos[info.id] = [] unless infos[info.id]?
+			infos[info.id].push info unless info in infos[info.id]
+
+	unregisterInfo = (info) ->
+		if infos[info.id] and info in infos[info.id]
+			infos[info.id] = (i for i in infos[info.id] when i isnt info)
+
+
+	infocb = (event) ->
+		info.change() for info in infos[parseInt event.data] if infos[parseInt event.data]?
+		console.log "infochange"
+
+	inboxcb = ->
+		inbox.change()
+		console.log "inboxchange"
+
+	source = new EventSource "/information/update"
+	source.addEventListener "change", infocb, false
+	source.addEventListener "inboxchange", inboxcb, false
+		
 	class PGObject extends ModelObject
 		constructor: (@id) ->
 				
@@ -64,7 +89,7 @@ exports.connect = () ->
 			callback? error, @type
 			
 
-		get: (callback, errorcallback) ->
+		get: (callback) ->
 			await @getType defer error
 			callback? error if error?
 			unless @values?
@@ -101,11 +126,23 @@ exports.connect = () ->
 				filter: "references",
 					callback
 
-		_url: -> "#{@type}#{if @id? then "/#{@id}" else ""}"
+		_url: -> "#{if @type? then @type else "information"}#{if @id? then "/#{@id}" else ""}"
 
 		_set: (values) ->
-				@values = values
-				(@[key] = value) for key,value of values
+			@values = values
+			(@[key] = value) for key,value of values
+
+		change: ->
+			delete @values
+			super()
+
+		on: (event, cb) ->
+			super event, cb
+			registerInfo @
+
+		removeCB: (event, cb) ->
+			super event, cb
+			unregisterInfo @ if @_cbs ==  {}
 
 	class File extends PGObject
 		create: (name) ->
@@ -119,9 +156,9 @@ exports.connect = () ->
 					defer error, {id: @id}
 			callback? error, @id
 
-		change: (content, callback) ->
+		setContent: (content, callback) ->
 			@_patch
-				method: "change"
+				method: "setContent"
 				content: content,
 					callback
 
@@ -275,6 +312,9 @@ exports.connect = () ->
 		 getSize: ->
 		 getList: ->
 
+	inbox = new Inbox
+	maybe = new Maybe
+	urgent = new Urgent
 	model =
 		File: File
 		Note: Note
@@ -293,6 +333,6 @@ exports.connect = () ->
 		Message:Message
 		Presence:Presence
 		Resource:Resource
-		Inbox:Inbox
-		Maybe:Maybe
-		Urgent:Urgent
+		inbox:inbox
+		maybe:maybe
+		urgent:urgent

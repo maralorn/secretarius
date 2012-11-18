@@ -52,7 +52,7 @@ app.get "/style.css", (req, res) ->
 	res.send csscache
 
 require("controller").serve app,
-	require("model").extend require("pgmodel").connect connectionString
+	require("pgmodel").connect connectionString
 
 require "systemd"
 require("http").createServer(app).listen if process.env.LISTEN_PID > 0 then "systemd" else 3000

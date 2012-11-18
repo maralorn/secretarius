@@ -13,6 +13,7 @@ exports.ModelObject = class ModelObject
 		
 	removeCb: (event, cb) ->
 		@_cbs[event] = (elem for elem in @_cbs[event] when elem isnt cb)
+		delete @_cbs[event] if @_cbs[event] == []
 
 	onChanged: (cb) ->
 		@on("changed", cb)
