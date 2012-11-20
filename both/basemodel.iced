@@ -5,11 +5,12 @@ exports.ModelObject = class ModelObject
 		@_cbs[event].push cb
 	
 	emit: (event) ->
-		for cb in @_cbs[event]
-			try
-				cb()
-			catch err
-				@removeCb event, cb
+		if @_cbs[event]?
+			for cb in @_cbs[event]
+				try
+					cb()
+				catch err
+					@removeCb event, cb
 		
 	removeCb: (event, cb) ->
 		@_cbs[event] = (elem for elem in @_cbs[event] when elem isnt cb)

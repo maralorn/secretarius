@@ -1,10 +1,10 @@
 .setStatus
-	button.default Normal
-	button.maybe Maybe
-	button.inbox Inbox
-	button.urgent Urgent
+	a(href="default") Normal
+	a(href="maybe") Maybe
+	a(href="inbox") Inbox
+	a(href="urgent") Urgent
 form.delay
-	input(type="text", size="10").date
+	input(type="text", size="10", value="dd.mm.yyyy").date
 	input(type="text", size="2", value="00").hour
 	| :
 	input(type="text", size="2", value="00").minute

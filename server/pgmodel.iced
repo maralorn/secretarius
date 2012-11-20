@@ -12,7 +12,7 @@ exports.connect = (connectionString) ->
 		await client.connect defer()
 		client.on "notification", (msg) -> callback null, msg
 		client.query "LISTEN #{channel};"
-		finishcallback -> client.end()
+		finishcallback? -> client.end()
 
 	query = (config, callback) ->
 		config.name = hash config.text
@@ -87,21 +87,28 @@ exports.connect = (connectionString) ->
 				await queryOne
 					text: "SELECT type FROM type WHERE id=$1;"
 					values: [@id],
-						defer error, {type: @type}
+						defer error, answer
+				unless answer? and not error?
+					error = {msg: "Couldnt get Type.", id: @id}
+				else
+					@type = answer.type
 			callback? error, @type
 
 		get: (callback) ->
 			await @getType defer error
-			callback? error if error?
-			await queryOne
-				text: "SELECT * FROM #{@type}view WHERE id=$1;"
-				values: [@id],
-					defer error, answer
-			await @getReferences defer error, references
-			answer.references = references
-			await @getAttachments defer error, attachments
-			answer.attachments = attachments
-			(@[key] = value) for key,value of answer
+			unless error?
+				await queryOne
+					text: "SELECT * FROM #{@type}view WHERE id=$1;"
+					values: [@id],
+						defer error, answer
+			unless error?
+				await @getReferences defer error, references
+			unless error?
+				answer.references = references
+				await @getAttachments defer error, attachments
+			unless error?
+				answer.attachments = attachments
+				(@[key] = value) for key,value of answer
 			callback error, answer
 
 		setStatus: (status, callback) ->

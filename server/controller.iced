@@ -1,9 +1,5 @@
 exports.serve = (app, model) ->
 
-	classByType = (type) ->
-		for name, class_ of model
-			return class_ if name.toLowerCase() == type
-
 	findGetter = (filter, object) ->
 		string = "get#{if filter? then filter else ''}".toLowerCase()
 		for name, getter of object
@@ -15,7 +11,7 @@ exports.serve = (app, model) ->
 		id = req.param "id"
 		return unless type?
 		console.log "#{httpmethod} /#{type}#{if id? then "/#{id}" else ""}"
-		object = new (classByType type)? id
+		object = new (model.getClassByType type)? id
 		switch httpmethod.toLowerCase()
 			when "get"
 				filter = req.param "filter"
@@ -42,7 +38,7 @@ exports.serve = (app, model) ->
 			when model.Inbox.prototype.getFirst
 				prep = (info, cb) ->
 					if info?
-						await info.get cb
+						cb null, {first: info.id}
 					else
 						cb null, {msg: "inbox is empty"}
 			when model.Inbox.prototype.getSize
@@ -64,36 +60,84 @@ exports.serve = (app, model) ->
 			res.send 500, {msg: "Internal Error"}
 			console.log error
 		
+	clients = {}
+
+	class NotifyClient
+		constructor: ->
+			@messageCount = 0
+			@id = Math.floor(Math.random() * 1000000000000000)
+			clients[@id] = @
+			@subscriptions = []
+
+		registerSocket: (req, res) ->
+			req.socket.setTimeout Infinity
+			@res = res
+			@res.cookie "notifyid", "#{@id}",
+				maxAge: 86400000
+				path: "/information/update"
+			@res.writeHead 200,
+				"Content-Type": "text/event-stream"
+				"Cache-Control": "no-cache"
+				"Connection": "keep-alive"
+			@res.write "\n"
+			req.on "close", =>
+				@res = null
+
+		refresh: ->
+			@timeout = new Date()
+			@timeout.setMinutes @timeout.getMinutes() + 10
+
+		inboxUpdate: ->
+			if @res?
+				@res.write "id: #{@messageCount++}\n"
+				@res.write "data: change\n"
+				@res.write "event: inboxchange\n\n"
+
+
+		wantsUpdate: (id) ->
+			if @res?
+				@refresh()
+			if @timeout < new Date()
+				delete clients[@id]
+			else if id in @subscriptions and @res?
+				return true
+			return false
+
+		send: (values) ->
+			@res.write "id: #{messageCount++}\n"
+			@res.write "data: #{values}\n"
+			@res.write "event: info\n\n"
+
+		setSubscriptions: (@subscriptions) ->
+
+
+	changecb = (error, msg) ->
+		id = parseInt msg.payload
+		uclients = []
+		for id, client of clients
+			uclients.push client if client.wantsUpdate id
+		if uclients.length > 0
+			await model.getInformation id, null, defer error, information
+			await information.get defer error, values
+			client.send JSON.stringify values for client in uclients
+
+	inboxcb = (error, msg) ->
+		for id, client of clients
+			client.inboxUpdate()
+		
+	model.listen "infochange", changecb
+	model.listen "inboxchange", inboxcb
+		
 	app.get "/information/update", (req, res) ->
-		req.socket.setTimeout Infinity
-		messageCount = 0
+		if clients[id = req.cookies.notifyid]?
+			client = clients[id]
+		else
+			client = new NotifyClient
+			clients[client.id] = client
+		client.registerSocket req, res
 
-		changecb = (error, msg) ->
-			messageCount++
-			res.write "id: #{messageCount}\n"
-			res.write "data: #{msg.payload}\n"
-			res.write "event: change\n\n"
-			console.log "infochange"
-
-		inboxcb = (error, msg) ->
-			messageCount++
-			res.write "id: #{messageCount}\n"
-			res.write "data: change\n"
-			res.write "event: inboxchange\n\n"
-			console.log "inboxchange"
-
-		await
-			model.listen "infochange", changecb, defer finishinfo
-			model.listen "inboxchange", inboxcb, defer finishinbox
-
-		res.writeHead 200,
-			"Content-Type": "text/event-stream"
-			"Cache-Control": "no-cache"
-			"Connection": "keep-alive"
-		res.write "\n"
-		req.on "close", ->
-			finishinfo()
-			finishinbox()
+	app.patch "/information/update", (req, res) ->
+		clients[req.cookies.notifyid?]?.setSubscriptions req.body.subscriptions
 
 	app.all "/:type/:id", parse
 	app.all "/:type", parse

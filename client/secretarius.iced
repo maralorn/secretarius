@@ -3,7 +3,7 @@ require "lib/jquery-ui"
 require "lib/jade"
 slots = require "slots"
 
-window.model = require("clientmodel").connect()
+window.model = require("model").extend require("clientmodel").connect()
 
 $ ->
 	$("body").html(require("template/body").render())

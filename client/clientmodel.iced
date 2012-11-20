@@ -7,23 +7,21 @@ exports.connect = () ->
 
 	infos = {}
 
-	registerInfo = (info) ->
-		if info.id?
-			infos[info.id] = [] unless infos[info.id]?
-			infos[info.id].push info unless info in infos[info.id]
+	registerInfo = (info) -> infos[info.id] = info if info.id?
 
-	unregisterInfo = (info) ->
-		if infos[info.id] and info in infos[info.id]
-			infos[info.id] = (i for i in infos[info.id] when i isnt info)
+	unregisterInfo = (info) -> delete infos[info.id] if info.id? and infos[info.id]?
 
+	infocb = (event) -> infos[parseInt event.data]?.change()
 
-	infocb = (event) ->
-		info.change() for info in infos[parseInt event.data] if infos[parseInt event.data]?
-		console.log "infochange"
+	inboxcb = -> inbox.change()
 
-	inboxcb = ->
-		inbox.change()
-		console.log "inboxchange"
+	getInformation = (id, type, callback) ->
+		if infos[id]?
+			callback? null, infos[id]
+		else
+			unless type? then await new Information(id).getType defer error, type
+			infos[id] = new (model.getClassByType type)(id) unless infos[id]?
+			callback? null, infos[id]
 
 	source = new EventSource "/information/update"
 	source.addEventListener "change", infocb, false
@@ -296,17 +294,18 @@ exports.connect = () ->
 	
 	class Inbox extends PGObject
 		getSize: (callback) ->
-			await @_get {filter: "size"}, defer(error, answer), "inbox"
-			callback? error, answer.size
+			await @_get {filter: "size"}, defer(error, {size: @size}), "inbox" unless @size?
+			callback? error, @size
 
 		getFirst: (callback) ->
-			await @_get {filter: "first"}, defer(error, answer), "inbox"
-			if answer.id?
-				info = new Information
-				info._set answer
-			else
-				info = null
-			callback? error, info
+			await @_get {filter: "first"}, defer(error, @first), "inbox" unless @first?
+			if @first.first? then getInformation @first.first, null, callback else callback? error, null
+
+		change: ->
+			delete @first
+			delete @size
+			super()
+
 
 	class Urgent extends PGObject
 		 getSize: ->
@@ -336,3 +335,4 @@ exports.connect = () ->
 		inbox:inbox
 		maybe:maybe
 		urgent:urgent
+		getInformation:getInformation

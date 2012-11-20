@@ -36,12 +36,15 @@ exports.InfoView = class InfoView extends View
 		@drawContent()
 	
 	drawContent: ->
+		info = @info
 		@viewslot.setContent require("template/infoframe").render()
 		context = @viewslot.getContentNode()
-		$(".setStatus > button.#{@info.status}").attr("disabled","disabled").addClass("button-selected")
+		$(".setStatus > a", context).click ->
+			info.setStatus $(@).attr("href")
+			return false
 		$(".setStatus", context).buttonset()
+		$(".setStatus > a[href='#{@info.status}']", context).addClass("button-selected")
 		$("form.delay > input.date", context).datepicker({dateFormat: "dd.mm.yy"})
-		info = @info
 		$("form.delay", context).submit ->
 			date = $(".date", @).val()
 			unless date == ''
@@ -53,14 +56,12 @@ exports.InfoView = class InfoView extends View
 				info.setDelay date
 			return false
 		$(".infocontent", context).html @content()
-		references = []
-		await for referenceid in @info.references
-			references.push reference = new (model.Information) referenceid
-			reference.get defer error
-		for reference in references
-			domnode = $(require("template/infolabel").render infolabel reference)
-			domnode.appendTo $(".references", context)
-			new InfoDraggable domnode, reference
+		for referenceid in @info.references
+			model.getInformation referenceid, null, (error, reference) ->
+				await reference.get defer error
+				domnode = $(require("template/infolabel").render infolabel reference)
+				domnode.appendTo $(".references", context)
+				new InfoDraggable domnode, reference
 		$(".references", context).droppable
 			drop: (event, ui) =>
 				info = ui.draggable.data("dragobject").getInformation()

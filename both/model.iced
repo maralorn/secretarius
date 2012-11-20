@@ -1,2 +1,5 @@
 exports.extend = (model) ->
-	model
+	model.getClassByType = (type) ->
+		for name, class_ of model
+			return class_ if name.toLowerCase() == type
+	return model

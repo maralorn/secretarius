@@ -33,7 +33,7 @@ exports.ContainerViewSlot = class ContainerViewSlot extends ViewSlot
 
 exports.TabViewSlot = class TabViewSlot extends ViewSlot
 	constructor: ->
-		@id = "Tab#{Math.floor Math.random() * 1000000}"
+		@id = "Tab#{Math.floor Math.random() * 2**32}"
 		$("#tabs > ul").append require("template/tabtitle").render
 			id: @id
 		$("#tabs").append require("template/tab").render
