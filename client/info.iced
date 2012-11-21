@@ -27,11 +27,11 @@ exports.InfoView = class InfoView extends View
 		
 	constructor: (@viewslot, @info) ->
 		new InfoDraggable @viewslot.getHeader(), @info
+		await @info.get defer()
 		@draw()
 		@info.onChanged => @draw()
 
 	draw: ->
-		await @info.get defer()
 		@viewslot.setTitle @title()
 		@drawContent()
 	
@@ -57,8 +57,7 @@ exports.InfoView = class InfoView extends View
 			return false
 		$(".infocontent", context).html @content()
 		for referenceid in @info.references
-			model.getInformation referenceid, null, (error, reference) ->
-				await reference.get defer error
+			model.getInformation referenceid, (error, reference) ->
 				domnode = $(require("template/infolabel").render infolabel reference)
 				domnode.appendTo $(".references", context)
 				new InfoDraggable domnode, reference

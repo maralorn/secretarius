@@ -4,11 +4,11 @@ exports.ModelObject = class ModelObject
 		@_cbs[event] = [] unless @_cbs[event]?
 		@_cbs[event].push cb
 	
-	emit: (event) ->
-		if @_cbs[event]?
+	emit: (event, data) ->
+		if @_cbs?[event]?
 			for cb in @_cbs[event]
 				try
-					cb()
+					cb data
 				catch err
 					@removeCb event, cb
 		
@@ -22,8 +22,8 @@ exports.ModelObject = class ModelObject
 	onDeleted: (cb) ->
 		@on("deleted", cb)
 
-	change: ->
-		@emit "changed"
+	change: (data) ->
+		@emit "changed", data
 
 	delete: ->
 		@emit "deleted"

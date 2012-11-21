@@ -43,9 +43,10 @@ exports.serve = (app, model) ->
 						cb null, {msg: "inbox is empty"}
 			when model.Inbox.prototype.getSize
 				prep = (size, cb) -> cb null, {size: size}
+			when model.Information.prototype.get
+				""
 			else
-				unless method in [model.Information.prototype.get]
-					error = {msg: "method not found"}
+				error = {msg: "method not found"}
 		unless error?
 			await
 				args.push defer error, result
@@ -79,7 +80,11 @@ exports.serve = (app, model) ->
 				"Content-Type": "text/event-stream"
 				"Cache-Control": "no-cache"
 				"Connection": "keep-alive"
-			@res.write "\n"
+			(empty = =>
+				if @res?
+					@res.write "\n"
+					setTimeout empty, 60000
+			)()
 			req.on "close", =>
 				@res = null
 
@@ -93,32 +98,32 @@ exports.serve = (app, model) ->
 				@res.write "data: change\n"
 				@res.write "event: inboxchange\n\n"
 
-
 		wantsUpdate: (id) ->
 			if @res?
 				@refresh()
 			if @timeout < new Date()
 				delete clients[@id]
-			else if id in @subscriptions and @res?
+			else if "#{id}" in @subscriptions and @res?
 				return true
 			return false
 
 		send: (values) ->
-			@res.write "id: #{messageCount++}\n"
+			@res.write "id: #{@messageCount++}\n"
 			@res.write "data: #{values}\n"
 			@res.write "event: info\n\n"
 
 		setSubscriptions: (@subscriptions) ->
+		pushSubscription: (subscription) ->
+			@subscription.push "#{subscription}"
 
 
 	changecb = (error, msg) ->
-		id = parseInt msg.payload
+		infoid = parseInt msg.payload
 		uclients = []
 		for id, client of clients
-			uclients.push client if client.wantsUpdate id
+			uclients.push client if client.wantsUpdate infoid
 		if uclients.length > 0
-			await model.getInformation id, null, defer error, information
-			await information.get defer error, values
+			await new model.Information(infoid).get defer error, values
 			client.send JSON.stringify values for client in uclients
 
 	inboxcb = (error, msg) ->
@@ -137,7 +142,8 @@ exports.serve = (app, model) ->
 		client.registerSocket req, res
 
 	app.patch "/information/update", (req, res) ->
-		clients[req.cookies.notifyid?]?.setSubscriptions req.body.subscriptions
+		clients[req.cookies.notifyid]?.setSubscriptions req.body.subscriptions if req.cookies.notifyid
+		res.send 200
 
 	app.all "/:type/:id", parse
 	app.all "/:type", parse

@@ -7,24 +7,49 @@ exports.connect = () ->
 
 	infos = {}
 
-	registerInfo = (info) -> infos[info.id] = info if info.id?
+	registerInfo = (info) ->
+		infos[info.id] = info
+		pushSubscriptions()
 
-	unregisterInfo = (info) -> delete infos[info.id] if info.id? and infos[info.id]?
+	pushSubscriptions = ->
+		request =
+			url: "information/update"
+			type: "patch"
+			dataType: "json"
+			data:
+				subscriptions: (id for id, info of infos)
+		console.log "PATCH /information/update"
+		$.ajax request
 
-	infocb = (event) -> infos[parseInt event.data]?.change()
+
+	unregisterInfo = (info) ->
+		if info.id? and infos[info.id]?
+			delete infos[info.id]
+			pushSubscriptions()
+
+	infocb = (event) ->
+		values = JSON.parse event.data
+		if infos[values.id]?
+			infos[values.id]._set values
 
 	inboxcb = -> inbox.change()
 
-	getInformation = (id, type, callback) ->
+	getInformation = (id, callback) ->
 		if infos[id]?
-			callback? null, infos[id]
+			if infos[id].__lock?
+				infos[id].__lock.push callback
+			else
+				callback? null, infos[id]
 		else
-			unless type? then await new Information(id).getType defer error, type
-			infos[id] = new (model.getClassByType type)(id) unless infos[id]?
-			callback? null, infos[id]
+			infos[id] = {__lock: [callback]}
+			await new Information(id).get defer error, values
+			info = new (model.getClassByType values.type)(values.id)
+			info._set values
+			cb?(null, info) for cb in infos[id].__lock
+			registerInfo info
 
 	source = new EventSource "/information/update"
-	source.addEventListener "change", infocb, false
+	source.addEventListener "info", infocb, false
 	source.addEventListener "inboxchange", inboxcb, false
 		
 	class PGObject extends ModelObject
@@ -54,7 +79,7 @@ exports.connect = () ->
 					dataType: "json"
 				if data? then request.data = data
 				console.log "#{type.toUpperCase()} #{request.url} (#{if data? then JSON.stringify data else ""})"
-				$.ajax(request)
+				$.ajax request
 			callback? null, answer
 
 	class Information extends PGObject
@@ -88,8 +113,6 @@ exports.connect = () ->
 			
 
 		get: (callback) ->
-			await @getType defer error
-			callback? error if error?
 			unless @values?
 				await @_get null, defer error, values
 				@_set values
@@ -129,18 +152,7 @@ exports.connect = () ->
 		_set: (values) ->
 			@values = values
 			(@[key] = value) for key,value of values
-
-		change: ->
-			delete @values
-			super()
-
-		on: (event, cb) ->
-			super event, cb
-			registerInfo @
-
-		removeCB: (event, cb) ->
-			super event, cb
-			unregisterInfo @ if @_cbs ==  {}
+			@change values
 
 	class File extends PGObject
 		create: (name) ->
@@ -152,6 +164,7 @@ exports.connect = () ->
 			await @_post
 				content: content,
 					defer error, {id: @id}
+			registerInfo @
 			callback? error, @id
 
 		setContent: (content, callback) ->
@@ -299,7 +312,7 @@ exports.connect = () ->
 
 		getFirst: (callback) ->
 			await @_get {filter: "first"}, defer(error, @first), "inbox" unless @first?
-			if @first.first? then getInformation @first.first, null, callback else callback? error, null
+			if @first.first? then getInformation @first.first, callback else callback? error, null
 
 		change: ->
 			delete @first
