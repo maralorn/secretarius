@@ -9,30 +9,19 @@ exports.connect = () ->
 
 	registerInfo = (info) ->
 		infos[info.id] = info
-		pushSubscriptions()
-
-	pushSubscriptions = ->
-		request =
-			url: "information/update"
-			type: "patch"
-			dataType: "json"
-			data:
-				subscriptions: (id for id, info of infos)
-		console.log "PATCH /information/update"
-		$.ajax request
-
 
 	unregisterInfo = (info) ->
 		if info.id? and infos[info.id]?
 			delete infos[info.id]
-			pushSubscriptions()
 
 	infocb = (event) ->
 		values = JSON.parse event.data
 		if infos[values.id]?
 			infos[values.id]._set values
 
-	inboxcb = -> inbox.change()
+	inboxcb = (event) ->
+		answer = JSON.parse event.data
+		inbox.change answer.size, answer.first
 
 	getInformation = (id, callback) ->
 		if infos[id]?
@@ -47,11 +36,10 @@ exports.connect = () ->
 			info._set values
 			cb?(null, info) for cb in infos[id].__lock
 			registerInfo info
+
 	setTimeout (->
-		source = new EventSource "/information/update"
-		source.addEventListener "info", infocb, false
-		source.addEventListener "inboxchange", inboxcb, false
-		source.addEventListener "message", (event) -> console.log event.data), 1
+		new EventSource("/information/update").addEventListener "message", infocb
+		new EventSource("/inbox/update").addEventListener "message", inboxcb), 1
 		
 	class PGObject extends ModelObject
 		constructor: (@id) ->
@@ -315,9 +303,8 @@ exports.connect = () ->
 			await @_get {filter: "first"}, defer(error, @first), "inbox" unless @first?
 			if @first.first? then getInformation @first.first, callback else callback? error, null
 
-		change: ->
-			delete @first
-			delete @size
+		change: (@size, first) ->
+			@first.first = first
 			super()
 
 

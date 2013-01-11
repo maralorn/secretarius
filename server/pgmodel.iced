@@ -503,14 +503,25 @@ exports.connect = (connectionString) ->
 				text: "SELECT count(*) FROM inbox;"
 				values: [],
 					defer error, answer
-			callback? error, answer?.count
+			if error? then callback? error; return
+			callback? null, answer?.count
 
 		getFirst: (callback) ->
 			await queryOne
-				text: "SELECT id, type FROM inbox ORDER BY created_at LIMIT 1;"
+				text: "SELECT id FROM inbox ORDER BY created_at LIMIT 1;"
 				values: [],
 					defer error, answer
-			callback? error, if answer?.id? then new Information answer.id else null
+			if error? then callback? error; return
+			callback? null, if answer?.id? then new Information answer.id else null
+
+		get: (callback) ->
+			answer = {}
+			await
+				@getSize defer error1, answer.size
+				@getFirst defer error2, answer.first
+			if error1? then callback? error1; return
+			if error2? then callback? error2; return
+			callback? null, answer
 
 	
 	class Urgent extends ModelObject

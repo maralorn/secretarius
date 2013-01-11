@@ -1,3 +1,7 @@
+KEEPMSGS = 500
+TIMEOUT = 59000
+
+
 exports.serve = (app, model) ->
 
 	findGetter = (filter, object) ->
@@ -60,92 +64,79 @@ exports.serve = (app, model) ->
 		else
 			res.send 500, {msg: "Internal Error"}
 			console.log error
-		
-	clients = {}
 
+	class Socket
+		constructor: (@req, @res, @client) ->
+			@res.connection.setTimeout 0
+			@res.writeHead 200,
+				"Content-Type": "text/event-stream"
+				"Cache-Control": "no-cache"
+				"Connection": "keep-alive"
+			(empty = =>
+				if @res?
+					@res.write "\n"
+					setTimeout empty, TIMEOUT
+			)()
+			@client.registerSocket @
+			@req.on "close", =>
+				@res = null
+				@client.deregisterSocket @
+
+		send: (event) ->
+			@res.write event
+
+		lastId: ->
+			
+
+		
 	class NotifyClient
 		constructor: ->
 			@messageCount = 0
-			@id = Math.floor(Math.random() * 1000000000000000)
-			clients[@id] = @
-			@subscriptions = []
+			@messages = {}
+			@sockets = []
 
-		registerSocket: (req, res) ->
-			#req.socket.setTimeout Infinity
-			res.connection.setTimeout 0
-			@res = res
-#			@res.cookie "notifyid", "#{@id}",
-#				maxAge: 86400000
-#				path: "/information/update"
-			@res.writeHead 200,
-				"Content-Type": "text/event-stream"
-#				"Cache-Control": "no-cache"
-#				"Connection": "keep-alive"
-			(empty = =>
-				if @res?
-					@res.write "data: Keepalive!\n\n"
-					setTimeout empty, 2000
-			)()
-			req.on "close", =>
-				@res = null
+		submit: (data) ->
+			@messageCount++
+			@messages[@messageCount] = event = "id: #{@messageCount}\ndata: #{data}\n\n"
+			socket.send event for socket in @sockets
+			if @messageCount > KEEPMSGS
+				delete @messages[@messageCount-KEEPMSGS]?
+			
+		registerSocket: (socket) ->
+			if (message = socket.lastId)? and message of @messages
+				while message <= @messageCount
+					socket.send @messages[message++]
+			@sockets.push socket
 
-		refresh: ->
-			@timeout = new Date()
-			@timeout.setMinutes @timeout.getMinutes() + 10
+		deregisterSocket: (socket) ->
+			@sockets = (sock for sock in @sockets when sock isnt socket)
 
-		inboxUpdate: ->
-			console.log "inboxupdate"
-			if @res?
-				@res.write "id: #{@messageCount++}\n"
-				@res.write "data: change\n"
-				@res.write "event: inboxchange\n\n"
+	class SimpleNotifyClient extends NotifyClient
+		constructor: (event, callback) ->
+			super()
+			model.listen event, (error, msg) =>
+				if error? then console.log error; return
+				await callback msg.payload, defer error, data
+				if error? then console.log error; return
+				@submit data
+					
+	changeclient = new SimpleNotifyClient "infochange", (msg, callback) ->
+		await new model.Information(parseInt(msg)).get defer error, values
+		if error? then console.log error; return
+		callback null, JSON.stringify values
 
-		wantsUpdate: (id) ->
-			if @res?
-				@refresh()
-			if @timeout < new Date()
-				delete clients[@id]
-			else if "#{id}" in @subscriptions and @res?
-				return true
-			return false
+	inboxclient = new SimpleNotifyClient "inboxchange", (msg, callback) ->
+		await new model.Inbox().get defer error, answer
+		if error? then console.log error; return
+		callback null, JSON.stringify
+			size: answer.size
+			first: answer.first.id
 
-		send: (values) ->
-#			@res.write "id: #{@messageCount++}\n"
-			@res.write "data: #{values}\n"
-#			@res.write "event: info\n\n"
-
-		setSubscriptions: (@subscriptions) ->
-		pushSubscription: (subscription) ->
-			@subscription.push "#{subscription}"
-
-
-	changecb = (error, msg) ->
-		infoid = parseInt msg.payload
-		uclients = []
-		for id, client of clients
-			uclients.push client if client.wantsUpdate infoid
-		if uclients.length > 0
-			await new model.Information(infoid).get defer error, values
-			client.send JSON.stringify values for client in uclients
-
-	inboxcb = (error, msg) ->
-		for id, client of clients
-			client.inboxUpdate()
-		
-	model.listen "infochange", changecb
-	model.listen "inboxchange", inboxcb
-		
 	app.get "/information/update", (req, res) ->
-		if clients[id = req.cookies.notifyid]?
-			client = clients[id]
-		else
-			client = new NotifyClient
-			clients[client.id] = client
-		client.registerSocket req, res
+		new Socket req, res, changeclient
 
-	app.patch "/information/update", (req, res) ->
-		clients[req.cookies.notifyid]?.setSubscriptions req.body.subscriptions if req.cookies.notifyid
-		res.send 200
+	app.get "/inbox/update", (req, res) ->
+		new Socket req, res, inboxclient
 
 	app.all "/:type/:id", parse
 	app.all "/:type", parse
