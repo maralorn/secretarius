@@ -71,19 +71,20 @@ exports.serve = (app, model) ->
 			@subscriptions = []
 
 		registerSocket: (req, res) ->
-			req.socket.setTimeout Infinity
+			#req.socket.setTimeout Infinity
+			res.connection.setTimeout 0
 			@res = res
-			@res.cookie "notifyid", "#{@id}",
-				maxAge: 86400000
-				path: "/information/update"
+#			@res.cookie "notifyid", "#{@id}",
+#				maxAge: 86400000
+#				path: "/information/update"
 			@res.writeHead 200,
 				"Content-Type": "text/event-stream"
-				"Cache-Control": "no-cache"
-				"Connection": "keep-alive"
+#				"Cache-Control": "no-cache"
+#				"Connection": "keep-alive"
 			(empty = =>
 				if @res?
-					@res.write "\n"
-					setTimeout empty, 60000
+					@res.write "data: Keepalive!\n\n"
+					setTimeout empty, 2000
 			)()
 			req.on "close", =>
 				@res = null
@@ -93,6 +94,7 @@ exports.serve = (app, model) ->
 			@timeout.setMinutes @timeout.getMinutes() + 10
 
 		inboxUpdate: ->
+			console.log "inboxupdate"
 			if @res?
 				@res.write "id: #{@messageCount++}\n"
 				@res.write "data: change\n"
@@ -108,9 +110,9 @@ exports.serve = (app, model) ->
 			return false
 
 		send: (values) ->
-			@res.write "id: #{@messageCount++}\n"
+#			@res.write "id: #{@messageCount++}\n"
 			@res.write "data: #{values}\n"
-			@res.write "event: info\n\n"
+#			@res.write "event: info\n\n"
 
 		setSubscriptions: (@subscriptions) ->
 		pushSubscription: (subscription) ->

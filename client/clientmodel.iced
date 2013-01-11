@@ -47,10 +47,11 @@ exports.connect = () ->
 			info._set values
 			cb?(null, info) for cb in infos[id].__lock
 			registerInfo info
-
-	source = new EventSource "/information/update"
-	source.addEventListener "info", infocb, false
-	source.addEventListener "inboxchange", inboxcb, false
+	setTimeout (->
+		source = new EventSource "/information/update"
+		source.addEventListener "info", infocb, false
+		source.addEventListener "inboxchange", inboxcb, false
+		source.addEventListener "message", (event) -> console.log event.data), 1
 		
 	class PGObject extends ModelObject
 		constructor: (@id) ->

@@ -16,7 +16,8 @@ exports.connect = (connectionString) ->
 
 	query = (config, callback) ->
 		config.name = hash config.text
-		await pg.connect connectionString, defer client
+		await pg.connect connectionString, defer error, client
+		if error? then callback? error; return
 		request = client.query config
 		request.on "error", (error) ->
 			request.error =
@@ -33,18 +34,22 @@ exports.connect = (connectionString) ->
 			cb = (row, result) ->
 				result.addRow(row)
 		await query config, defer error, request
+		if error? then callback? error; return
 		request.on "row", cb
 		await request.on "end", defer result
-		error = request.error if request.error?
-		callback? error, result?.rows
+		if request.error? then callback? request.error; return
+		callback? null, result.rows
 		
 	queryOne = (config, callback) ->
 		await queryMany config, defer error, result
-		callback? error, result?[0]
+		if error? then callback? error; return
+		unless result[0]? then callback {msg: "queryOne got no result.", config: config}; return
+		callback? null, result[0]
 	
 	queryNone = (config, callback) ->
 		await queryMany config, defer error, result
-		callback? error, {msg: "succes"}
+		if error? then callback? error; return
+		callback? null, null
 
 	class PGObject extends ModelObject
 		constructor: (@id) ->
@@ -60,9 +65,10 @@ exports.connect = (connectionString) ->
 			await queryOne
 				text: "INSERT INTO information (status) VALUES ($1) RETURNING id;"
 				values: [status],
-					defer error, {id: @id}
+					defer error, answer
+			if error? then callback? error; return
 			@addReference referencing if referencing?
-			callback? error, @id
+			callback? null, @id = answer.id
 
 		addReference: (reference, callback) ->
 			queryNone
@@ -88,28 +94,31 @@ exports.connect = (connectionString) ->
 					text: "SELECT type FROM type WHERE id=$1;"
 					values: [@id],
 						defer error, answer
-				unless answer? and not error?
-					error = {msg: "Couldnt get Type.", id: @id}
+				if error? then callback? error; return
+				unless answer?
+					callback? {msg: "Couldnt get Type.", id: @id}
+					return
 				else
 					@type = answer.type
-			callback? error, @type
+			callback? null, @type
 
 		get: (callback) ->
 			await @getType defer error
+			if error? then callback? error; return
 			unless error?
 				await queryOne
 					text: "SELECT * FROM #{@type}view WHERE id=$1;"
 					values: [@id],
 						defer error, answer
-			unless error?
-				await @getReferences defer error, references
-			unless error?
-				answer.references = references
-				await @getAttachments defer error, attachments
-			unless error?
-				answer.attachments = attachments
-				(@[key] = value) for key,value of answer
-			callback error, answer
+			if error? then callback? error; return
+			await @getReferences defer error, references
+			if error? then callback? error; return
+			answer.references = references
+			await @getAttachments defer error, attachments
+			if error? then callback? error; return
+			answer.attachments = attachments
+			(@[key] = value) for key,value of answer
+			callback null, answer
 
 		setStatus: (status, callback) ->
 			queryNone
@@ -151,14 +160,16 @@ exports.connect = (connectionString) ->
 				text: "SELECT referenceid FROM \"references\" WHERE id=$1;"
 				values: [@id],
 					defer error, result
-			callback? error, (row.referenceid for row in result)
+			if error? then callback? error; return
+			callback? null, (row.referenceid for row in result)
 
 		getAttachments: (callback) ->
 			await queryMany
 				text: "SELECT fileid FROM attachments WHERE id=$1;"
 				values: [@id],
 					defer error, result
-			callback? error, (row.fileid for row in result)
+			if error? then callback? error; return
+			callback? null, (row.fileid for row in result)
 
 
 	class File extends PGObject
@@ -185,12 +196,13 @@ exports.connect = (connectionString) ->
 
 		create: (content, callback) ->
 			await super "inbox", null, defer error
-			callback? error if error?
-			await queryOne
+			if error? then callback? error; return
+			await queryNone
 				text: "INSERT INTO note (id, content) VALUES ($1, $2);"
 				values: [@id, content],
 					defer error
-			callback? error, @id
+			if error? then callback? error; return
+			callback? null, @id
 
 		setContent: (content, callback) ->
 			query
@@ -201,115 +213,143 @@ exports.connect = (connectionString) ->
 
 	class Task extends Information
 
-		create: (description, referencing=null) ->
-			super "default", referencing
-			queryOne
+		create: (description, referencing=null, callback) ->
+			await super "default", referencing, defer error
+			if error? then callback? error; return
+			queryNone
 				text: "INSERT INTO task (id, description) VALUES ($1, $2);"
-				values: [@id, description]
-			@id
+				values: [@id, description],
+					defer error
+			if error? then callback? error; return
+			callback? null, @id
 
-		done: ->
-			query
+		done: (callback) ->
+			queryNone
 				text: "UPDATE task SET completed=CURRENT_TIMESTAMP WHERE id=$1"
-				values: [@id]
+				values: [@id],
+					callback
 
-		undo: ->
-			query
+		undo: (callback) ->
+			queryNone
 				text: "UPDATE task SET completed=NULL WHERE id=$1"
-				values: [@id]
+				values: [@id],
+					callback
 
 	class Project extends Task
 
-		create: (description, referencing=null, parent=null) ->
-			super description, referencing
-			queryOne
+		create: (description, referencing=null, parent=null, callback) ->
+			await super description, referencing, defer error
+			if error? then callback? error; return
+			queryNone
 				text: "INSERT INTO project (id, parent) VALUES ($1, $2);"
-				values: [@id, parent]
-			@id
+				values: [@id, if parent? then parent.id else null],
+					defer error
+			if error? then callback? error; return
+			callback? null, @id
 
-		setParent: (parent) ->
-			query
+
+		setParent: (parent, callback) ->
+			queryNone
 				text: "UPDATE project SET parent=$2 WHERE id=$1;"
-				values: [@id, if parent? then parent.id else null]
+				values: [@id, if parent? then parent.id else null],
+					callback
 
-		collapse: ->
-			query
+		collapse: (callback) ->
+			queryNone
 				text: "UPDATE project SET collapsed=TRUE WHERE id=$1;"
-				values: [@id]
+				values: [@id],
+					callback
 
-		uncollapse: ->
-			query
+		uncollapse: (callback) ->
+			queryNone
 				text: "UPDATE project SET collapsed=FALSE WHERE id=$1;"
-				values: [@id]
+				values: [@id],
+					callback
 
-		@getAll: () ->
+		@getAll: (callback) ->
 			queryMany
 				text: "SELECT * FROM projectview WHERE completed IS NULL;"
-				values: []
+				values: [],
+					callback
 
 
 	class Asap extends Task
 
-		create: (description, list, referencing=null, project=null) ->
-			super description, referencing
-			queryOne
-				text: "INSERT INTO asap (id, asaplist, project) VALUES ($1, (SELECT id FROM asaplist WHERE name=$2), $3);"
-				values: [@id, list, project]
-			@id
+		create: (description, list, referencing=null, project=null, callback) ->
+			super description, referencing, defer error
+			if error? then callback? error; return
+			queryNone
+				text: "INSERT INTO asap (id, asaplist, project) VALUES ($1, $2, $3);"
+				values: [@id, list.id, if project? then project.id else null],
+					defer error
+			if error? then callback? error; return
+			callback? null, @id
 
-		setProject: (project) ->
-			query
+		setProject: (project, callback) ->
+			queryNone
 				text: "UPDATE asap SET project=$2 WHERE id=$1;"
-				values: [@id, project]
+				values: [@id, project.id],
+					callback
 
-		setList: (list) ->
-			query
-				text: "UPDATE asap AS a SET asaplist=l.id FROM asaplist l WHERE l.name=$2 AND a.id=$1;"
-				values: [@id, list]
 
-		@getAllFromList: (list) ->
+		setList: (list, callback) ->
+			queryNone
+				text: "UPDATE asap SET asaplist=$2 WHERE id=$1;"
+				values: [@id, list.id],
+					callback
+
+		@getAllFromList: (list, callback) ->
 			queryMany
-				text: "SELECT a.* FROM asapview a WHERE a.asaplist=$1 AND completed IS NULL;"
-				values: [list]
+				text: "SELECT * FROM asapview WHERE asaplist=$1 AND completed IS NULL;"
+				values: [list.id],
+					callback
 
-		@getAll: () ->
+		@getAll: (callback) ->
 			queryMany
 				text: "SELECT * FROM asapview WHERE completed IS NULL;"
-				values: []
+				values: [],
+					callback
 
 
 	class AsapList extends PGObject
 
-		create: (name) ->
-			{id: @id} = queryOne
+		create: (name, callback) ->
+			queryOne
 				text: "INSERT INTO asaplist (name) VALUES ($1) RETURNING id;"
-				values: [name]
-			@id
+				values: [name],
+					defer error, answer
+			if error? then callback? error; return
+			callback? null, @id = answer.id
 
-		rename: (name) ->
-			query
+		rename: (name, callback) ->
+			queryNone
 				text: "UPDATE asaplist SET name=$2 WHERE id=$1;"
-				values: [@id, name]
+				values: [@id, name],
+					callback
 
-		delete: ->
-			query
+		delete: (callback) ->
+			queryNone
 				text: "DELETE FROM asaplist WHERE id=$1;"
-				values: [@id]
+				values: [@id],
+					callback
 
-		@getByName: (name) =>
-			answer = queryOne
+		@getByName: (name, callback) =>
+			queryOne
 				text: "SELECT id FROM asaplist WHERE name=$1;"
-				values: [name]
-			new @ answer.id
+				values: [name],
+				 	defer error, answer
+			if error? then callback? error; return
+			callback null, new @ answer.id
 
-		@getAll: ->
+		@getAll: (callback) ->
 			queryMany
 				text: "SELECT id, name FROM asaplist;"
-				values: []
+				values: [],
+					callback
 
 	class SocialEntity extends Information
 
-		create: ->
+		create: (callback) ->
 			super()
 			queryOne
 				text: "INSERT INTO social_entity (id) VALUES ($1);"
