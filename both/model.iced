@@ -1,12 +1,14 @@
-exports.getClassByType = (type) ->
+model = exports
+
+model.getClassByType = (type) ->
 		for name, class_ of @
 			return class_ if name.toLowerCase() == type
 
-exports.extend = (obj) ->
-	exports[key] = value for key, value of obj
-	return exports
+model.extend = (obj) ->
+	model[key] = value for key, value of obj
+	return model
 
-exports.ModelObject = class ModelObject
+model.ModelObject = class ModelObject
 	on: (event, cb) ->
 		@_cbs = {} unless @_cbs?
 		@_cbs[event] = [] unless @_cbs[event]?
@@ -58,10 +60,10 @@ class InfoCache
 				cb null, @infos[id]
 		else
 			@infos[id] = {__lock: [cb]}
-			await new Information(id).get defer error, values
+			await new (model.Information(id)).get defer error, values
 			info = new (model.getClassByType values.type)(values.id)
 			info._store values
 			cb(null, info) for cb in infos[id].__lock
 			@registerInfo info
 
-exports.cache = new InfoCache
+model.cache = new InfoCache

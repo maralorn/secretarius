@@ -260,15 +260,26 @@ exports.connect = () ->
 	
 	class Inbox extends PGObject
 		getSize: (cb) ->
-			await @_get {filter: "size"}, defer(error, {size: @size}), "inbox" unless @size?
-			cb error, @size
+			unless @values?
+				await @get defer(error)
+				if error? then cb error; return
+			cb null, @values.size
 
 		getFirst: (cb) ->
-			await @_get {filter: "first"}, defer(error, @first), "inbox" unless @first?
-			if @first.first? then model.cache.getInformation @first.first, cb else cb error, null
+			unless @values?
+				await @get defer(error)
+				if error? then cb error; return
+			cb null, @values.first
 
-		_store: (@size, first) ->
-			@first.first = first
+		get: (cb) ->
+			unless @values?
+				await @_get defer(error, res), null, "inbox"
+				if error? then cb error; return
+				res.first =	if res.first? then model.cache.getInformation res.first else null
+				@_store res
+			cb null, res
+
+		_store: (@values) ->
 			@change()
 
 

@@ -77,8 +77,7 @@ exports.connect = (connectionString) ->
 			transaction = config.transaction
 			if transaction? then t = transaction else await t = new Transaction defer()
 			if config.before?
-				await config.before defer(error, cfg), config, t
-				config = cfg if cfg?
+				await config.before.call @, defer(error), config, t
 				if error?
 					cb error
 					t.rollback() unless transaction?
@@ -91,7 +90,7 @@ exports.connect = (connectionString) ->
 				t.rollback() unless transaction?
 				return
 			if config.after?
-				await config.after defer(error, result), res, t
+				await config.after.call @, defer(error, result), res, t
 				res = result if result?
 				if error?
 					cb error
@@ -131,7 +130,7 @@ exports.connect = (connectionString) ->
 				text: "INSERT INTO information (status) VALUES ($1) RETURNING id;"
 				values: [status],
 				after: (cb, res, transaction) ->
-					@id = answer.id
+					@id = res.id
 					if referencing?
 						await @addReference defer(error), referencing, transaction
 						if error? then cb error; return
@@ -168,8 +167,7 @@ exports.connect = (connectionString) ->
 
 		get: (cb, t) ->
 			@queryOne cb, t,
-				before: (cb, config, t) ->
-					await @getType cb, t
+				before: (cb, config, t) -> @getType cb, t
 				text: "SELECT * FROM #{@type}view WHERE id=$1;"
 				values: [@id],
 				after: (cb, res, t) ->
@@ -180,7 +178,7 @@ exports.connect = (connectionString) ->
 					if error? then cb error; return
 					res.attachments = attachments
 					(@[key] = value) for key,value of res
-					cb null, answer
+					cb null, res
 
 		setStatus: (cb, status, t) ->
 			@queryNone cb, t,
@@ -250,9 +248,9 @@ exports.connect = (connectionString) ->
 		create: (cb, content, t) ->
 			@queryNone cb, t,
 				before: (cb, config, t) ->
-					await super defer(error), "inbox", null, t
+					await Note.__super__.create.call @, defer(error), "inbox", null, t
 					config.values = [@id, content]
-					cb (error)
+					cb error
 				text: "INSERT INTO note (id, content) VALUES ($1, $2);"
 				after: (cb) -> cb(null, @id)
 

@@ -2,7 +2,7 @@ KEEPMSGS = 500
 TIMEOUT = 59000
 
 
-exports.serve = (app, model) ->
+exports.serve = (app, model, debug) ->
 	
 
 	class Socket
@@ -85,44 +85,56 @@ exports.serve = (app, model) ->
 			for method, handler of tree
 				registerMethod method, handler
 
-		findObject: (req) ->
-			type = req.param "type"
+		findObject: (cb, req) ->
+			type = req.params.type
 			if type in ["inbox", "urgent", "maybe"]
-				model[type]
+				cb null, model[type]
+			else if (id = req.params.id)
+				model.cache.getInformation cb, id
+			else if (cls = model.getClassByType type)? and req.method == "POST"
+				cb null, new cls
 			else
-				model.cache.getInformation req.param "id"
+				cb
+					msg: "No object found"
+					type: type
+					id: id
 
 		findMethod: (req, object) ->
-			switch req.method.toLowerCase()
-				when "get"
-					@findGetter req.param("filter"), object
-				when "post"
+			switch req.method
+				when "GET"
+					@findGetter req.query.filter, object
+				when "POST"
 					object.create
-				when "patch"
+				when "PATCH"
 					object[req.body.method]
 
 		parse: (req, res) =>
-			object = @findObject req
-			method = @findMethod req, object
-			@executeMethod object, method, req, res
-
-		executeMethod: (object, method, req, res) ->
+			num = Math.floor Math.random() * 1000
+			console.log "#{num}:\t#{req.method}\t#{req.url}\tquery:#{JSON.stringify req.query}\tbody:#{JSON.stringify req.body} {"
+			respond = (code, msg) ->
+				res.send code, msg
+				console.log "#{num}:\t#{code}\t#{JSON.stringify msg} }"
 			abort = (error) ->
-				res.send 500, {msg: "Internal Error"}
-				console.log error
+				console.log "#{num}:\t", error
+				respond 500, {msg: "Internal Error", error: error}
+			await @findObject defer(error, object), req
+			if error? then abort error; return
+			method = @findMethod req, object
+			if error? then abort error; return
 			handler = @methods[method]
 			unless handler? then abort {msg: "method not found", method: method}; return
 			if handler.before?
 				await handler.before defer(error, args), req
-				if error? then abort(error); return
+				if error? then abort error; return
 			await
-				params = [defer error, result]
+				params = [defer(error, result)]
 				params.concat args if args?
-				method.apply object, args
+				method.apply object, params
+			if error? then abort error; return
 			if handler.after?
 				await handler.after defer(error, result), result
-				if error? then abort(error); return
-			res.send 200, if result? then result else {msg: "success"}
+				if error? then abort error; return
+			respond 200, if result? then result else {msg: "success"}
 
 #			if error? and error.pgerror? and error.pgerror.code in ["23505"]
 #				error = null
@@ -171,10 +183,10 @@ exports.serve = (app, model) ->
 		after: (cb, ans) -> cb null, if res? then {first: res.id} else {msg: "inbox is empty"}
 
 	parser.registerMethod model.inbox.getSize,
-		after:(cb, ans) -> cb null, {size: ans}
+		after: (cb, ans) -> cb null, {size: ans}
 		
 	parser.registerMethod model.inbox.get,
-		after:(cb, ans) -> cb null, {size: ans.siz, first: ans.first?.id}
+		after: (cb, ans) -> cb null, {size: ans.siz, first: ans.first?.id}
 		
 	parser.registerMethod model.Information.prototype.get, {}
 
