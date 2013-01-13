@@ -5,8 +5,7 @@ exports.connect = () ->
 		model.cache.storeInfo JSON.parse event.data
 
 	inboxcb = (event) ->
-		answer = JSON.parse event.data
-		model.inbox._store change answer.size, answer.first
+		model.inbox._store (-> return), JSON.parse event.data
 
 	new EventSource("/information/update").addEventListener "message", infocb
 	new EventSource("/inbox/update").addEventListener "message", inboxcb
@@ -24,7 +23,7 @@ exports.connect = () ->
 			@_call cb, "delete", url
 
 		_patch: (cb, data, url) ->
-			@_call cb, "patch", data, cb, url
+			@_call cb, "patch", data, url
 
 		_post: (cb, data, url) ->
 			@_call cb, "post", data, url
@@ -50,8 +49,8 @@ exports.connect = () ->
 		_create: (cb, args) ->
 			await @_post defer(error, ans), args
 			if error? then cb error; return
-			registerInfo @
 			cb null, @id = ans.id
+			model.cache.registerInfo @
 
 		addReference: (cb, reference) ->
 			@_patch cb,
@@ -275,12 +274,14 @@ exports.connect = () ->
 			unless @values?
 				await @_get defer(error, res), null, "inbox"
 				if error? then cb error; return
-				res.first =	if res.first? then model.cache.getInformation res.first else null
-				@_store res
-			cb null, res
+				await @_store defer(error), res
+			cb null, @values
 
-		_store: (@values) ->
-			@change()
+		_store: (cb, @values) ->
+			if @values.first? then await model.cache.getInformation defer(error, @values.first), @values.first
+			if error? then cb error; return
+			@change @values
+			cb()
 
 
 	class Urgent extends PGObject

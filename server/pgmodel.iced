@@ -167,9 +167,11 @@ exports.connect = (connectionString) ->
 
 		get: (cb, t) ->
 			@queryOne cb, t,
-				before: (cb, config, t) -> @getType cb, t
-				text: "SELECT * FROM #{@type}view WHERE id=$1;"
-				values: [@id],
+				before: (cb, config, t) ->
+					await @getType defer(error), t
+					config.text = "SELECT * FROM #{@type}view WHERE id=$1;"
+					cb error
+				values: [@id]
 				after: (cb, res, t) ->
 					await @getReferences defer(error, references), t
 					if error? then cb error; return
@@ -221,6 +223,9 @@ exports.connect = (connectionString) ->
 				text: "SELECT fileid FROM attachments WHERE id=$1;"
 				values: [@id]
 				after: (cb, res) -> cb null, (row.fileid for row in res)
+
+		_store: (values) ->
+			@change(values)
 
 
 	class File extends PGObject

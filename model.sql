@@ -334,8 +334,9 @@ CREATE VIEW "noteview" AS
 
 DROP FUNCTION set_timestamp() CASCADE;
 CREATE FUNCTION set_timestamp() RETURNS trigger AS $$
+	plan = SD.setdefault("plan", plpy.prepare("UPDATE information SET last_edited=CURRENT_TIMESTAMP WHERE id=$1", ["uuid"]))
 	id = TD["new"]["id"]
-	plpy.execute("UPDATE information SET last_edited=CURRENT_TIMESTAMP WHERE id="+str(id)+";")
+	plpy.execute(plan, [id])
 	return "OK";
 $$ LANGUAGE plpythonu;
 

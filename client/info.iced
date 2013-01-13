@@ -39,9 +39,9 @@ exports.InfoView = class InfoView extends View
 		info = @info
 		@viewslot.setContent require("template/infoframe").render()
 		context = @viewslot.getContentNode()
-		$(".setStatus > a", context).click ->
-			info.setStatus $(@).attr("href")
-			return false
+		$(".setStatus > a", context).click (ev) ->
+			ev.preventDefault()
+			info.setStatus ( -> return), $(@).attr("href")
 		$(".setStatus", context).buttonset()
 		$(".setStatus > a[href='#{@info.status}']", context).addClass("button-selected")
 		$("form.delay > input.date", context).datepicker({dateFormat: "dd.mm.yy"})
@@ -53,7 +53,7 @@ exports.InfoView = class InfoView extends View
 				min = $(".minute", @).val()
 				hour = $(".hour", @).val()
 				date = new Date(year, parseInt(month)-1, day, parseInt(hour)+1, min)
-				info.setDelay date
+				info.setDelay (-> return), date
 			return false
 		$(".infocontent", context).html @content()
 		for referenceid in @info.references
@@ -65,7 +65,7 @@ exports.InfoView = class InfoView extends View
 			drop: (event, ui) =>
 				info = ui.draggable.data("dragobject").getInformation()
 				if info?
-					@info.addReference info
+					@info.addReference (-> return), info
 
 class NoteView extends InfoView
 	title: ->

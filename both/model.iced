@@ -25,6 +25,7 @@ model.ModelObject = class ModelObject
 	removeCb: (event, cb) ->
 		@_cbs[event] = (elem for elem in @_cbs[event] when elem isnt cb)
 		delete @_cbs[event] if @_cbs[event] == []
+		console.log event, "callback removed", @constructor.name
 
 	onChanged: (cb) ->
 		@on("changed", cb)
@@ -50,7 +51,7 @@ class InfoCache
 			delete @infos[info.id]
 
 	storeInfo: (values) ->
-		infos[values.id]?._store values
+		@infos[values.id]?._store values
 
 	getInformation: (cb, id) ->
 		if @infos[id]?
@@ -60,10 +61,11 @@ class InfoCache
 				cb null, @infos[id]
 		else
 			@infos[id] = {__lock: [cb]}
-			await new (model.Information(id)).get defer error, values
+			await new model.Information(id).get defer error, values
+			if error? then cb error; return
 			info = new (model.getClassByType values.type)(values.id)
 			info._store values
-			cb(null, info) for cb in infos[id].__lock
+			cb null, info for cb in @infos[id].__lock
 			@registerInfo info
 
 model.cache = new InfoCache

@@ -28,8 +28,10 @@ class InboxView extends View
 				return false
 
 	newInfo: ->
-		await @inbox.get defer(error, {size: @size, first: @info})
+		await @inbox.get defer error, res
 		if error? then alert(error); return
+		@size = res.size
+		@info = res.first
 		@draw()
 		if @info?
 			InfoView.create @infoslot, @info

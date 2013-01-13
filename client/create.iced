@@ -3,7 +3,9 @@
 
 exports.CreateNoteDraggable = class CreateNoteDraggable extends Draggable
 	createView: (viewslot) ->
-		new CreateNoteView viewslot
+		note = new (model.Note)
+		await note.create defer(error, id), ""
+		InfoView.create viewslot, note
 
 class CreateView extends View
 	constructor: (@viewslot) ->

@@ -3,10 +3,7 @@ TIMEOUT = 59000
 
 
 exports.serve = (app, model, debug) ->
-	
-
 	class Socket
-	
 		constructor: (@req, @res, @client) ->
 			@res.connection.setTimeout 0
 			@res.writeHead 200,
@@ -31,7 +28,6 @@ exports.serve = (app, model, debug) ->
 		
 
 	class NotifyClient
-		
 		constructor: ->
 			@messageCount = 0
 			@messages = {}
@@ -55,7 +51,6 @@ exports.serve = (app, model, debug) ->
 
 
 	class SimpleNotifyClient extends NotifyClient
-
 		constructor: (event, callback) ->
 			super()
 			model.listen event, (error, msg) =>
@@ -66,7 +61,6 @@ exports.serve = (app, model, debug) ->
 
 
 	class Parser
-
 		constructor: ->
 			@methods = {}
 
@@ -89,7 +83,7 @@ exports.serve = (app, model, debug) ->
 			type = req.params.type
 			if type in ["inbox", "urgent", "maybe"]
 				cb null, model[type]
-			else if (id = req.params.id)
+			else if (id = req.params.id)?
 				model.cache.getInformation cb, id
 			else if (cls = model.getClassByType type)? and req.method == "POST"
 				cb null, new cls
@@ -115,7 +109,6 @@ exports.serve = (app, model, debug) ->
 				res.send code, msg
 				console.log "#{num}:\t#{code}\t#{JSON.stringify msg} }"
 			abort = (error) ->
-				console.log "#{num}:\t", error
 				respond 500, {msg: "Internal Error", error: error}
 			await @findObject defer(error, object), req
 			if error? then abort error; return
@@ -128,7 +121,7 @@ exports.serve = (app, model, debug) ->
 				if error? then abort error; return
 			await
 				params = [defer(error, result)]
-				params.concat args if args?
+				params = params.concat args if args?
 				method.apply object, params
 			if error? then abort error; return
 			if handler.after?
@@ -141,14 +134,16 @@ exports.serve = (app, model, debug) ->
 			
 				
 	changeclient = new SimpleNotifyClient "infochange", (msg, callback) ->
-		await new model.Information(parseInt(msg)).get defer error, values
+		await model.cache.getInformation defer(error, info), msg
+		if error? then console.log error; return
+		await info.get defer error, values
 		if error? then console.log error; return
 		callback null, JSON.stringify values
 
 	inboxclient = new SimpleNotifyClient "inboxchange", (msg, callback) ->
-		await new model.Inbox().get defer error, answer
+		await model.inbox.get defer error, answer
 		if error? then console.log error; return
-		console.log JSON.stringify answer
+		console.log "inbox:", JSON.stringify answer
 		callback null, JSON.stringify
 			size: answer.size
 			first: if answer.first? then answer.first.id else null
@@ -186,7 +181,7 @@ exports.serve = (app, model, debug) ->
 		after: (cb, ans) -> cb null, {size: ans}
 		
 	parser.registerMethod model.inbox.get,
-		after: (cb, ans) -> cb null, {size: ans.siz, first: ans.first?.id}
+		after: (cb, ans) -> cb null, {size: ans.size, first: ans.first?.id}
 		
 	parser.registerMethod model.Information.prototype.get, {}
 
