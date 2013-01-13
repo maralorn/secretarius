@@ -1,65 +1,35 @@
-{ModelObject} = require "basemodel"
-
-notImplemented = () ->
-	alert("This Function is not implemented!")
-
 exports.connect = () ->
-
-	infos = {}
-
-	registerInfo = (info) ->
-		infos[info.id] = info
-
-	unregisterInfo = (info) ->
-		if info.id? and infos[info.id]?
-			delete infos[info.id]
+	model = require "model"
 
 	infocb = (event) ->
-		values = JSON.parse event.data
-		if infos[values.id]?
-			infos[values.id]._set values
+		model.cache.storeInfo JSON.parse event.data
 
 	inboxcb = (event) ->
 		answer = JSON.parse event.data
-		inbox.change answer.size, answer.first
+		model.inbox._store change answer.size, answer.first
 
-	getInformation = (id, callback) ->
-		if infos[id]?
-			if infos[id].__lock?
-				infos[id].__lock.push callback
-			else
-				callback? null, infos[id]
-		else
-			infos[id] = {__lock: [callback]}
-			await new Information(id).get defer error, values
-			info = new (model.getClassByType values.type)(values.id)
-			info._set values
-			cb?(null, info) for cb in infos[id].__lock
-			registerInfo info
-
-	setTimeout (->
-		new EventSource("/information/update").addEventListener "message", infocb
-		new EventSource("/inbox/update").addEventListener "message", inboxcb), 1
+	new EventSource("/information/update").addEventListener "message", infocb
+	new EventSource("/inbox/update").addEventListener "message", inboxcb
 		
-	class PGObject extends ModelObject
+	class PGObject extends model.ModelObject
 		constructor: (@id) ->
 				
-		_get: (data, callback, url)->
-			@_call "get", data, callback, url
+		_get: (cb, data, url)->
+			@_call cb, "get", data, url
 
-		_put: (data, callback, url) ->
-			@_call "put", data, callback, url
+		_put: (cb, data, url) ->
+			@_call cb, "put", data, url
 		
-		_delete: (callback, url) ->
-			@_call "delete", callback, url
+		_delete: (cb, url) ->
+			@_call cb, "delete", url
 
-		_patch: (data, callback, url) ->
-			@_call "patch", data, callback, url
+		_patch: (cb, data, url) ->
+			@_call cb, "patch", data, cb, url
 
-		_post: (data, callback, url) ->
-			@_call "post", data, callback, url
+		_post: (cb, data, url) ->
+			@_call cb, "post", data, url
 
-		_call: (type, data, callback, url) ->
+		_call: (cb, type, data, url) ->
 			await
 				request =
 					url: if url? then url else @_url()
@@ -69,76 +39,74 @@ exports.connect = () ->
 				if data? then request.data = data
 				console.log "#{type.toUpperCase()} #{request.url} (#{if data? then JSON.stringify data else ""})"
 				$.ajax request
-			callback? null, answer
+			cb null, answer
+
 
 	class Information extends PGObject
 		constructor: (@id) ->
 			tempType = @constructor.name.toLowerCase()
 			@type = tempType if tempType != "information"
 
-		create: (status = "default", referencing=null, callback) ->
-			notImplemented()
+		_create: (cb, args) ->
+			await @_post defer(error, ans), args
+			if error? then cb error; return
+			registerInfo @
+			cb null, @id = ans.id
 
-		addReference: (reference, callback) ->
-			@_patch
+		addReference: (cb, reference) ->
+			@_patch cb,
 				method: "addReference"
-				reference: reference.id,
-					callback
-		removeReference: (reference, callback) ->
-			@_patch
+				reference: reference.id
+
+		removeReference: (cb, reference) ->
+			@_patch cb,
 				method: "removeReference"
-				reference: reference.id,
-					callback
+				reference: reference.id
 			
-		delete: (callback) ->
-			@_delete callback
+		delete: (cb) ->
+			@_delete cb
 
-		getType: (callback) ->
+		getType: (cb) ->
 			unless @type?
-				await @_get
+				await @_get cb,
 					filter: "type",
-						defer error,{type: @type}
-			callback? error, @type
-			
+						defer error, {type: @type}
+			cb error, @type
 
-		get: (callback) ->
+		get: (cb) ->
 			unless @values?
-				await @_get null, defer error, values
-				@_set values
-			callback? error, @values
+				await @_get defer(error, values)
+				if error? then cb error; return
+				@_store values
+			cb null, @values
 
-		setStatus: (status, callback) ->
-			@_patch
+		setStatus: (cb, status) ->
+			@_patch cb,
 				method: "setStatus"
-				status: status,
-					callback
+				status: status
 
-		setDelay: (delay, callback) ->
-			@_patch
+		setDelay: (cb, delay) ->
+			@_patch cb,
 				method: "setDelay"
-				delay: delay,
-					callback
+				delay: delay
 
-		attach: (file, callback) ->
-			@_patch
+		attach: (cb, file) ->
+			@_patch cb,
 				method: "attach"
-				file: file.id,
-					callback
+				file: file.id
 
-		detach: (file, callback) ->
-			@_patch
+		detach: (cb, file) ->
+			@_patch cb,
 				method: "detach"
-				file: file.id,
-					callback
+				file: file.id
 
-		getReferences: (callback) ->
-			@_get
-				filter: "references",
-					callback
+		getReferences: (cb) ->
+			@_get cb,
+				filter: "references"
 
 		_url: -> "#{if @type? then @type else "information"}#{if @id? then "/#{@id}" else ""}"
 
-		_set: (values) ->
+		_store: (values) ->
 			@values = values
 			(@[key] = value) for key,value of values
 			@change values
@@ -149,18 +117,14 @@ exports.connect = () ->
 		delete: ->
 
 	class Note extends Information
-		create: (content, callback) ->
-			await @_post
+		create: (cb, content) ->
+			@_create cb,
 				content: content,
-					defer error, {id: @id}
-			registerInfo @
-			callback? error, @id
 
-		setContent: (content, callback) ->
-			@_patch
+		setContent: (cb, content) ->
+			@_patch cb,
 				method: "setContent"
-				content: content,
-					callback
+				content: content
 
 	class Task extends Information
 		create: (description, referencing=null) ->
@@ -295,27 +259,24 @@ exports.connect = () ->
 		getList: ->
 	
 	class Inbox extends PGObject
-		getSize: (callback) ->
+		getSize: (cb) ->
 			await @_get {filter: "size"}, defer(error, {size: @size}), "inbox" unless @size?
-			callback? error, @size
+			cb error, @size
 
-		getFirst: (callback) ->
+		getFirst: (cb) ->
 			await @_get {filter: "first"}, defer(error, @first), "inbox" unless @first?
-			if @first.first? then getInformation @first.first, callback else callback? error, null
+			if @first.first? then model.cache.getInformation @first.first, cb else cb error, null
 
-		change: (@size, first) ->
+		_store: (@size, first) ->
 			@first.first = first
-			super()
+			@change()
 
 
 	class Urgent extends PGObject
 		 getSize: ->
 		 getList: ->
 
-	inbox = new Inbox
-	maybe = new Maybe
-	urgent = new Urgent
-	model =
+	model.extend
 		File: File
 		Note: Note
 		Asap: Asap
@@ -333,7 +294,6 @@ exports.connect = () ->
 		Message:Message
 		Presence:Presence
 		Resource:Resource
-		inbox:inbox
-		maybe:maybe
-		urgent:urgent
-		getInformation:getInformation
+		inbox:new Inbox
+		maybe:new Maybe
+		urgent:new Urgent

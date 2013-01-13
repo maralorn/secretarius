@@ -2,56 +2,121 @@ hash = do ->
 	crypto = require "crypto"
 	(key) -> crypto.createHash("md5").update(key).digest "base64"
 
-{ModelObject} = require "basemodel"
-
 exports.connect = (connectionString) ->
-	pg = require("pg")
-	
-	listen = (channel, callback, finishcallback) ->
+	pg = require "pg"
+	model = require "model"
+
+	listen = (channel, cb, finishcb) ->
 		client = new (pg.Client) connectionString
 		await client.connect defer()
-		client.on "notification", (msg) -> callback null, msg
+		client.on "notification", (msg) -> cb null, msg
 		client.query "LISTEN #{channel};"
-		finishcallback? -> client.end()
+		finishcb? -> client.end()
 
-	query = (config, callback) ->
-		config.name = hash config.text
-		await pg.connect connectionString, defer error, client
-		if error? then callback? error; return
-		request = client.query config
-		request.on "error", (error) ->
-			request.error =
-				msg: "pgerror"
-				pgerror: error
-				query: config
-		callback? null, request
+	class Transaction
+		constructor: (cb) ->
+			await pg.connect connectionString, defer error, @client
+			if error? then cb error; return
+			@begin()
+			cb()
+
+		begin: ->
+			@client.query "begin"
+
+		commit: ->
+			@client.query "commit"
+
+		rollback: ->
+			@client.query "rollback"
+
+		query: (cb, config) ->
+			config.name = hash config.text
+			request = @client.query config
+			request.on "error", (error) ->
+				request.error =
+					msg: "pgerror"
+					pgerror: error
+					query: config
+			cb null, request
 	
-	queryMany = (config, callback) ->
-		if config.callback?
-			cb = config.callback
-			delete config.callback
-		else
-			cb = (row, result) ->
-				result.addRow(row)
-		await query config, defer error, request
-		if error? then callback? error; return
-		request.on "row", cb
-		await request.on "end", defer result
-		if request.error? then callback? request.error; return
-		callback? null, result.rows
+		queryMany: (cb, config) ->
+			if config.cb?
+				callbackb = config.cb
+				delete config.cb
+			else
+				callback = (row, res) ->
+					res.addRow(row)
+			await @query defer(error, request), config
+			if error? then cb error; return
+			request.on "row", callback
+			await request.on "end", defer res
+			if request.error? then cb request.error; return
+			cb null, res.rows
 		
-	queryOne = (config, callback) ->
-		await queryMany config, defer error, result
-		if error? then callback? error; return
-		unless result[0]? then callback {msg: "queryOne got no result.", config: config}; return
-		callback? null, result[0]
+		queryOne: (cb, config) ->
+			await @queryMany defer(error, res), config
+			if error? then cb? error; return
+			unless res[0]? then cb {msg: "queryOne got no result.", config: config}; return
+			cb? null, res[0]
 	
-	queryNone = (config, callback) ->
-		await queryMany config, defer error, result
-		if error? then callback? error; return
-		callback? null, null
+		queryNone: (cb, config) ->
+			await @queryMany defer(error, res), config
+			if error? then cb? error; return
+			cb? null, null
 
-	class PGObject extends ModelObject
+	class PGObject extends model.ModelObject
+
+
+#	text
+#	values
+#	transaction
+#	after
+#	before
+#	expect
+		query: (cb, config) ->
+			transaction = config.transaction
+			if transaction? then t = transaction else await t = new Transaction defer()
+			if config.before?
+				await config.before defer(error, cfg), config, t
+				config = cfg if cfg?
+				if error?
+					cb error
+					t.rollback() unless transaction?
+					return
+			await t[config.func] defer(error, res),
+				text: config.text
+				values: if config.values? then config.values else []
+			if error?
+				cb error
+				t.rollback() unless transaction?
+				return
+			if config.after?
+				await config.after defer(error, result), res, t
+				res = result if result?
+				if error?
+					cb error
+					t.rollback() unless transaction?
+					return
+			t.commit() unless transaction?
+			cb null, res
+
+		queryNone: (cb, transaction, config) ->
+			config.transaction = transaction
+			config.func = "queryNone"
+			@query cb, config
+
+		queryOne: (cb, transaction, config) ->
+			config.transaction = transaction
+			config.func = "queryOne"
+			@query cb, config
+		
+		queryMany: (cb, transaction, config) ->
+			config.transaction = transaction
+			config.func = "queryMany"
+			@query cb, config
+
+
+	class PGEntry extends PGObject
 		constructor: (@id) ->
 
 
@@ -61,295 +126,256 @@ exports.connect = (connectionString) ->
 			tempType = @constructor.name.toLowerCase()
 			@type = tempType if tempType != "information"
 			
-		create: (status = "default", referencing=null, callback) ->
-			await queryOne
+		create: (cb, status = "default", referencing=null, t) ->
+			@queryOne cb, t,
 				text: "INSERT INTO information (status) VALUES ($1) RETURNING id;"
 				values: [status],
-					defer error, answer
-			if error? then callback? error; return
-			@addReference referencing if referencing?
-			callback? null, @id = answer.id
+				after: (cb, res, transaction) ->
+					@id = answer.id
+					if referencing?
+						await @addReference defer(error), referencing, transaction
+						if error? then cb error; return
+					cb null, @id
 
-		addReference: (reference, callback) ->
-			queryNone
+		addReference: (cb, reference, t) ->
+			@queryNone cb, t,
 				text: "INSERT INTO \"references\" (id, referenceid) VALUES ($1, $2);"
-				values: [@id, reference.id],
-					callback
+				values: [@id, reference.id]
 
-		removeReference: (reference, callback) ->
-			queryNone
+
+		removeReference: (cb, reference, t) ->
+			@query cb, t,
 				text: "DELETE FROM \"references\" WHERE id=$1 AND referenceid=$2"
-				values: [@id, reference.id],
-					callback
+				values: [@id, reference.id]
 
-		delete: (callback) ->
-			queryNone
+		delete: (cb, t) ->
+			@query cb, t,
 				text: "DELETE FROM information WHERE id=$1;"
-				values: [@id],
-					callback
+				values: [@id]
 
-		getType: (callback) ->
-			unless @type
-				await queryOne
+		getType: (cb, t) ->
+			if @type?
+				cb? null, @type
+			else
+				@queryOne cb, t,
 					text: "SELECT type FROM type WHERE id=$1;"
-					values: [@id],
-						defer error, answer
-				if error? then callback? error; return
-				unless answer?
-					callback? {msg: "Couldnt get Type.", id: @id}
-					return
-				else
-					@type = answer.type
-			callback? null, @type
+					values: [@id]
+					after: (cb, res) ->
+						if res?
+							cb null, (@type = res.type)
+						else
+							cb {msg: "Couldnt get Type.", id: @id}
 
-		get: (callback) ->
-			await @getType defer error
-			if error? then callback? error; return
-			unless error?
-				await queryOne
-					text: "SELECT * FROM #{@type}view WHERE id=$1;"
-					values: [@id],
-						defer error, answer
-			if error? then callback? error; return
-			await @getReferences defer error, references
-			if error? then callback? error; return
-			answer.references = references
-			await @getAttachments defer error, attachments
-			if error? then callback? error; return
-			answer.attachments = attachments
-			(@[key] = value) for key,value of answer
-			callback null, answer
+		get: (cb, t) ->
+			@queryOne cb, t,
+				before: (cb, config, t) ->
+					await @getType cb, t
+				text: "SELECT * FROM #{@type}view WHERE id=$1;"
+				values: [@id],
+				after: (cb, res, t) ->
+					await @getReferences defer(error, references), t
+					if error? then cb error; return
+					res.references = references
+					await @getAttachments defer(error, attachments), t
+					if error? then cb error; return
+					res.attachments = attachments
+					(@[key] = value) for key,value of res
+					cb null, answer
 
-		setStatus: (status, callback) ->
-			queryNone
+		setStatus: (cb, status, t) ->
+			@queryNone cb, t,
 				text: "UPDATE information SET status=$2 WHERE id=$1;"
-				values: [@id, status],
-					callback
+				values: [@id, status]
 
-		setDelay: (delay, callback) ->
-			queryNone
+		setDelay: (cb, delay, t) ->
+			@queryNone cb, t,
 				text: "UPDATE information SET status='inbox', delay=$2 WHERE id=$1;"
-				values: [@id, delay.toISOString()],
-					callback
+				values: [@id, delay.toISOString()]
 
-		attach: (file, callback) ->
-			queryNone
+		attach: (cb, file, t) ->
+			@queryNone cb, t,
 				text: "INSERT INTO attachments (id, fileid) VALUES ($1, $2);"
-				values: [@id, file.id],
-					callback
+				values: [@id, file.id]
 
-		detach: (file, callback) ->
-			queryNone
+		detach: (cb, file, t) ->
+			@queryNone cb, t,
 				text: "DELETE FROM attachments WHERE id=$1 AND fileid=$2);"
-				values: [@id, file.id],
-					callback
+				values: [@id, file.id]
 
-		_set: (table, map, allowed, callback) ->
+		_set: (cb, table, map, allowed, t) ->
 			answers = {}
 			errors = {}
 			await for key, value of map
 				if not allowed? or key in allowed
-					query
+					@queryNone defer(errors[key]), t,
 						text: "UPDATE #{table} SET $2=$3 WHERE id=$1;"
 						values: [@id, key, value],
-							defer errors[key], answers[key]
-			callback? errors, answers
+			cb errors, answers
 
-		getReferences: (callback) ->
-			await queryMany
+		getReferences: (cb, t) ->
+			@queryMany cb, t,
 				text: "SELECT referenceid FROM \"references\" WHERE id=$1;"
-				values: [@id],
-					defer error, result
-			if error? then callback? error; return
-			callback? null, (row.referenceid for row in result)
+				values: [@id]
+				after: (cb, res) -> cb null, (row.referenceid for row in res)
 
-		getAttachments: (callback) ->
-			await queryMany
+		getAttachments: (cb, t) ->
+			@queryMany cb, t,
 				text: "SELECT fileid FROM attachments WHERE id=$1;"
-				values: [@id],
-					defer error, result
-			if error? then callback? error; return
-			callback? null, (row.fileid for row in result)
+				values: [@id]
+				after: (cb, res) -> cb null, (row.fileid for row in res)
 
 
 	class File extends PGObject
 
-		create: (name) ->
-			{id: @id} = queryOne
+		create: (cb, name, t) ->
+			@queryOne cb, t,
 				text: "INSERT INTO file (name) VALUES ($1) RETURNING id;"
 				values: [name]
-			@id
+				after: (cb, res) -> cb null, @id = res.id
 			
-		getName: ->
-			answer = queryOne
+		getName: (cb, t) ->
+			@queryOne cb, t,
 				text: "SELECT name FROM file WHERE id=$1;"
 				values: [@id]
-			answer.name
+				after: (cb, res) -> cb null, res.name
 
-		delete: ->
-			query
+		delete: (cb, t)->
+			@queryNone cb, t,
 				text: "DELETE FROM file WHERE id=$1"
 				values: [@id]
 
 
 	class Note extends Information
 
-		create: (content, callback) ->
-			await super "inbox", null, defer error
-			if error? then callback? error; return
-			await queryNone
+		create: (cb, content, t) ->
+			@queryNone cb, t,
+				before: (cb, config, t) ->
+					await super defer(error), "inbox", null, t
+					config.values = [@id, content]
+					cb (error)
 				text: "INSERT INTO note (id, content) VALUES ($1, $2);"
-				values: [@id, content],
-					defer error
-			if error? then callback? error; return
-			callback? null, @id
+				after: (cb) -> cb(null, @id)
 
-		setContent: (content, callback) ->
-			query
+		setContent: (cb, content, t) ->
+			@queryNone cb, t,
 				text: "UPDATE note SET content=$2 WHERE id=$1"
-				values: [@id, content],
-					callback
+				values: [@id, content]
 
 
 	class Task extends Information
 
-		create: (description, referencing=null, callback) ->
-			await super "default", referencing, defer error
-			if error? then callback? error; return
-			queryNone
+		create: (cb, description, referencing=null, t) ->
+			@queryNone cb, t,
+				before: (cb, config, t) ->
+					await super defer(error), "default", referencing, t
+					config.values = [@id, content]
+					cb(error)
 				text: "INSERT INTO task (id, description) VALUES ($1, $2);"
-				values: [@id, description],
-					defer error
-			if error? then callback? error; return
-			callback? null, @id
+				after: (cb) -> cb(null, @id)
 
-		done: (callback) ->
-			queryNone
+		done: (cb, t) ->
+			@queryNone cb, t,
 				text: "UPDATE task SET completed=CURRENT_TIMESTAMP WHERE id=$1"
-				values: [@id],
-					callback
+				values: [@id]
 
-		undo: (callback) ->
-			queryNone
+		undo: (cb, t) ->
+			@queryNone cb, t,
 				text: "UPDATE task SET completed=NULL WHERE id=$1"
-				values: [@id],
-					callback
+				values: [@id]
 
 	class Project extends Task
 
-		create: (description, referencing=null, parent=null, callback) ->
-			await super description, referencing, defer error
-			if error? then callback? error; return
-			queryNone
+		create: (cb, description, referencing=null, parent=null, t) ->
+			@queryNone cb, t,
+				before: (cb, config, t) ->
+					await super defer(error), description, referencing, t
+					config.values = [@id, if parent? then parent.id else null]
+					cb(error)
 				text: "INSERT INTO project (id, parent) VALUES ($1, $2);"
-				values: [@id, if parent? then parent.id else null],
-					defer error
-			if error? then callback? error; return
-			callback? null, @id
+				after: (cb) -> cb(null, @id)
 
-
-		setParent: (parent, callback) ->
-			queryNone
+		setParent: (cb, parent, t) ->
+			@queryNone cb, t,
 				text: "UPDATE project SET parent=$2 WHERE id=$1;"
-				values: [@id, if parent? then parent.id else null],
-					callback
+				values: [@id, if parent? then parent.id else null]
 
-		collapse: (callback) ->
-			queryNone
+		collapse: (cb, t) ->
+			@queryNone cb, t,
 				text: "UPDATE project SET collapsed=TRUE WHERE id=$1;"
-				values: [@id],
-					callback
+				values: [@id]
 
-		uncollapse: (callback) ->
-			queryNone
+		uncollapse: (cb, t) ->
+			@queryNone
 				text: "UPDATE project SET collapsed=FALSE WHERE id=$1;"
-				values: [@id],
-					callback
+				values: [@id]
 
-		@getAll: (callback) ->
-			queryMany
+		@getAll: (cb, t) ->
+			@queryMany cb, t,
 				text: "SELECT * FROM projectview WHERE completed IS NULL;"
-				values: [],
-					callback
 
 
 	class Asap extends Task
 
-		create: (description, list, referencing=null, project=null, callback) ->
-			super description, referencing, defer error
-			if error? then callback? error; return
-			queryNone
+		create: (cb, description, list, referencing=null, project=null, t) ->
+			@queryNone cb, t,
+				before: (cb, config, t) ->
+					super defer(error), description, referencing, t
+					config.values = [@id, list.id, if project? then project.id else null]
+					cb(error)
 				text: "INSERT INTO asap (id, asaplist, project) VALUES ($1, $2, $3);"
-				values: [@id, list.id, if project? then project.id else null],
-					defer error
-			if error? then callback? error; return
-			callback? null, @id
+				after: (cb) -> cb(null, @id)
 
-		setProject: (project, callback) ->
-			queryNone
+		setProject: (cb, project, t) ->
+			@queryNone cb, t,
 				text: "UPDATE asap SET project=$2 WHERE id=$1;"
-				values: [@id, project.id],
-					callback
+				values: [@id, project.id]
 
 
-		setList: (list, callback) ->
-			queryNone
+		setList: (cb, list, t) ->
+			@queryNone cb, t,
 				text: "UPDATE asap SET asaplist=$2 WHERE id=$1;"
-				values: [@id, list.id],
-					callback
+				values: [@id, list.id]
 
-		@getAllFromList: (list, callback) ->
-			queryMany
+		@getAllFromList: (cb, list, t) ->
+			@queryMany cb, t,
 				text: "SELECT * FROM asapview WHERE asaplist=$1 AND completed IS NULL;"
-				values: [list.id],
-					callback
+				values: [list.id]
 
-		@getAll: (callback) ->
-			queryMany
+		@getAll: (cb, t) ->
+			@queryMany cb, t,
 				text: "SELECT * FROM asapview WHERE completed IS NULL;"
-				values: [],
-					callback
 
+	class AsapList extends PGEntry
 
-	class AsapList extends PGObject
-
-		create: (name, callback) ->
-			queryOne
+		create: (cb, name, t) ->
+			@queryOne cb, t,
 				text: "INSERT INTO asaplist (name) VALUES ($1) RETURNING id;"
-				values: [name],
-					defer error, answer
-			if error? then callback? error; return
-			callback? null, @id = answer.id
+				values: [name]
+				after: (cb, res) -> cb null, (@id = res.id)
 
-		rename: (name, callback) ->
-			queryNone
+		rename: (cb, name, t) ->
+			@queryNone cb, t,
 				text: "UPDATE asaplist SET name=$2 WHERE id=$1;"
-				values: [@id, name],
-					callback
+				values: [@id, name]
 
-		delete: (callback) ->
-			queryNone
+		delete: (cb, t) ->
+			@queryNone cb, t,
 				text: "DELETE FROM asaplist WHERE id=$1;"
-				values: [@id],
-					callback
+				values: [@id]
 
-		@getByName: (name, callback) =>
-			queryOne
+		@getByName: (cb, name, t) =>
+			@queryOne cb, t,
 				text: "SELECT id FROM asaplist WHERE name=$1;"
-				values: [name],
-				 	defer error, answer
-			if error? then callback? error; return
-			callback null, new @ answer.id
+				values: [name]
+				after: (cb, res) -> cb null, new @ res.id
 
-		@getAll: (callback) ->
-			queryMany
+		@getAll: (cb, t) ->
+			@queryMany cb, t,
 				text: "SELECT id, name FROM asaplist;"
-				values: [],
-					callback
 
 	class SocialEntity extends Information
 
-		create: (callback) ->
+		create: (cb) ->
 			super()
 			queryOne
 				text: "INSERT INTO social_entity (id) VALUES ($1);"
@@ -428,11 +454,11 @@ exports.connect = (connectionString) ->
 		addParticipant: (participant) ->
 		removeParticipant: (participant) ->
 
-	class Protocol extends PGObject
+	class Protocol extends PGEntry
 		@find: (name) ->
 		delete: ->
 	
-	class Server extends PGObject
+	class Server extends PGEntry
 		@find: (name, protocol) ->
 		delete: ->
 
@@ -477,18 +503,18 @@ exports.connect = (connectionString) ->
 		create: (from, time=new Date()) ->
 		addResource: (resource) ->
 
-	class Resource extends PGObject
+	class Resource extends PGEntry
 		create: (name, status, message) ->
 		delete: ->
 	
-	class Daemon extends PGObject
+	class Daemon extends PGEntry
 		registrate: (name, status) ->
 		setStatus: (status) ->
 		setMessage: (message) ->
 		deregistrate: ->
 		@getAll: ->
 	
-	class Maybe extends ModelObject
+	class Maybe extends PGObject
 
 		getSize: ->
 		getList: ->
@@ -496,40 +522,34 @@ exports.connect = (connectionString) ->
 				text: "SELECT * FROM maybe ORDER BY last_edited;"
 				values: []
 	
-	class Inbox extends ModelObject
+	class Inbox extends PGObject
 		
-		getSize: (callback) ->
-			await queryOne
+		getSize: (cb, t) ->
+			@queryOne cb, t,
 				text: "SELECT count(*) FROM inbox;"
-				values: [],
-					defer error, answer
-			if error? then callback? error; return
-			callback? null, answer?.count
+				after: (cb, res) -> cb null, res.count
 
-		getFirst: (callback) ->
-			await queryOne
+		getFirst: (cb, t) ->
+			@queryMany cb, t,
 				text: "SELECT id FROM inbox ORDER BY created_at LIMIT 1;"
-				values: [],
-					defer error, answer
-			if error? then callback? error; return
-			callback? null, if answer?.id? then new Information answer.id else null
+				after: (cb, res) -> cb null, if res[0]?.id? then new Information(res[0].id) else null
 
-		get: (callback) ->
+		get: (cb, t) ->
 			answer = {}
 			await
-				@getSize defer error1, answer.size
-				@getFirst defer error2, answer.first
-			if error1? then callback? error1; return
-			if error2? then callback? error2; return
-			callback? null, answer
+				@getSize defer(error1, answer.size), t
+				@getFirst defer(error2, answer.first), t
+			if error1? then cb? error1; return
+			if error2? then cb? error2; return
+			cb? null, answer
 
 	
-	class Urgent extends ModelObject
+	class Urgent extends PGObject
 
 		getSize: ->
 		getList: ->
 
-	model =
+	model.extend
 		File: File
 		Note: Note
 		Asap: Asap
@@ -547,7 +567,7 @@ exports.connect = (connectionString) ->
 		Message:Message
 		Presence:Presence
 		Resource:Resource
-		Inbox:Inbox
-		Maybe:Maybe
-		Urgent:Urgent
+		inbox:new Inbox
+		maybe:new Maybe
+		urgent:new Urgent
 		listen: listen
