@@ -3,9 +3,13 @@ require "lib/jquery-ui"
 require "lib/jade"
 slots = require "slots"
 
-window.model = require("clientmodel").connect()
-
 $ ->
+	if /window/.test document.URL
+		window.open "/", "mywindow","width=400,height=200,toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=no,copyhistory=no,resizable=no"
+		console.log "a"
+		window.open('', '_self', '')
+		window.close()
+		console.log "b"
 	$("body").html(require("template/body").render())
 	new (require("inbox").InboxDraggable)($("#menu > button:contains('Inbox')"))
 	new (require("create").CreateNoteDraggable)($("#menu > button:contains('New Note')"))

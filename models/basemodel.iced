@@ -17,10 +17,10 @@ model.ModelObject = class ModelObject
 	emit: (event, data) ->
 		if @_cbs?[event]?
 			for cb in @_cbs[event]
-				try
+#				try
 					cb data
-				catch err
-					@removeCb event, cb
+#				catch err
+#					@removeCb event, cb
 		
 	removeCb: (event, cb) ->
 		@_cbs[event] = (elem for elem in @_cbs[event] when elem isnt cb)

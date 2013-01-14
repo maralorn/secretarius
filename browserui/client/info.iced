@@ -1,4 +1,5 @@
 {View, Draggable} = require("view")
+model = require "jsonmodel"
 
 getViewByType = (type) ->
 	view = viewByType[type]
@@ -57,10 +58,10 @@ exports.InfoView = class InfoView extends View
 			return false
 		$(".infocontent", context).html @content()
 		for referenceid in @info.references
-			model.getInformation referenceid, (error, reference) ->
-				domnode = $(require("template/infolabel").render infolabel reference)
-				domnode.appendTo $(".references", context)
-				new InfoDraggable domnode, reference
+			await model.cache.getInformation defer(error, reference), referenceid
+			domnode = $(require("template/infolabel").render infolabel reference)
+			domnode.appendTo $(".references", context)
+			new InfoDraggable domnode, reference
 		$(".references", context).droppable
 			drop: (event, ui) =>
 				info = ui.draggable.data("dragobject").getInformation()

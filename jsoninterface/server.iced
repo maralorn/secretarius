@@ -1,7 +1,6 @@
 KEEPMSGS = 500
 TIMEOUT = 59000
 
-
 exports.serve = (app, model, debug) ->
 	class Socket
 		constructor: (@req, @res, @client) ->
@@ -81,17 +80,15 @@ exports.serve = (app, model, debug) ->
 
 		findObject: (cb, req) ->
 			type = req.params.type
+			cls = model.getClassByType type
 			if type in ["inbox", "urgent", "maybe"]
 				cb null, model[type]
-			else if (id = req.params.id)?
+			else if cls? and (id = req.params.id)?
 				model.cache.getInformation cb, id
-			else if (cls = model.getClassByType type)? and req.method == "POST"
+			else if cls? and req.method == "POST"
 				cb null, new cls
 			else
-				cb
-					msg: "No object found"
-					type: type
-					id: id
+				cb 0
 
 		findMethod: (req, object) ->
 			switch req.method
@@ -102,35 +99,42 @@ exports.serve = (app, model, debug) ->
 				when "PATCH"
 					object[req.body.method]
 
-		parse: (req, res) =>
-			num = Math.floor Math.random() * 1000
-			console.log "#{num}:\t#{req.method}\t#{req.url}\tquery:#{JSON.stringify req.query}\tbody:#{JSON.stringify req.body} {"
+		parse: (req, res, next) =>
+
+			return next() unless req.accepts("json")?
+	
+			if debug
+				num = Math.floor Math.random() * 1000
+				console.log "#{num}:\t#{req.method}\t#{req.url}\tquery:#{JSON.stringify req.query}\tbody:#{JSON.stringify req.body} {"
+
 			respond = (code, msg) ->
-				res.send code, msg
-				console.log "#{num}:\t#{code}\t#{JSON.stringify msg} }"
+				res.json code, msg
+				console.log "#{num}:\t#{code}\t#{JSON.stringify msg} }" if debug
+
 			abort = (error) ->
-				respond 500, {msg: "Internal Error", error: error}
+					respond 500,
+					msg: "Internal Error"
+					error: error
+			
 			await @findObject defer(error, object), req
-			if error? then abort error; return
+			return next() if error is 0
+			return abort error if error?
 			method = @findMethod req, object
-			if error? then abort error; return
+			return abort error if error?
 			handler = @methods[method]
-			unless handler? then abort {msg: "method not found", method: method}; return
+			return next() unless handler?
 			if handler.before?
 				await handler.before defer(error, args), req
-				if error? then abort error; return
+				return abort error if error?
 			await
 				params = [defer(error, result)]
 				params = params.concat args if args?
 				method.apply object, params
-			if error? then abort error; return
+			return abort error if error?
 			if handler.after?
 				await handler.after defer(error, result), result
-				if error? then abort error; return
+				return abort error if error?
 			respond 200, if result? then result else {msg: "success"}
-
-#			if error? and error.pgerror? and error.pgerror.code in ["23505"]
-#				error = null
 			
 				
 	changeclient = new SimpleNotifyClient "infochange", (msg, callback) ->
@@ -165,7 +169,9 @@ exports.serve = (app, model, debug) ->
 		before: (cb, req) -> cb null, [req.body.status]
 
 	parser.registerMethod model.Information.prototype.addReference,
-		before: (cb, req)	->	cb null, [model.cache.getInformation req.body.reference]
+		before: (cb, req)	->
+			await model.cache.getInformation defer(error, reference), req.body.reference
+			cb error, [reference]
 
 	parser.registerMethod model.Information.prototype.setDelay,
 		before: (cb, req) -> cb null, [new Date(req.body.delay)]
@@ -175,7 +181,7 @@ exports.serve = (app, model, debug) ->
 		after: afterOnPost
 		
 	parser.registerMethod model.inbox.getFirst,
-		after: (cb, ans) -> cb null, if res? then {first: res.id} else {msg: "inbox is empty"}
+		after: (cb, ans) -> cb null, if ans? then {first: ans.id} else {msg: "inbox is empty"}
 
 	parser.registerMethod model.inbox.getSize,
 		after: (cb, ans) -> cb null, {size: ans}
@@ -185,5 +191,5 @@ exports.serve = (app, model, debug) ->
 		
 	parser.registerMethod model.Information.prototype.get, {}
 
-	app.all "/:type/:id", parser.parse
-	app.all "/:type", parser.parse
+	app.all "/json/:type/:id", parser.parse
+	app.all "/json/:type", parser.parse

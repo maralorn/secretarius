@@ -4,7 +4,7 @@ hash = do ->
 
 exports.connect = (connectionString) ->
 	pg = require "pg"
-	model = require "model"
+	model = require "./basemodel"
 
 	listen = (channel, cb, finishcb) ->
 		client = new (pg.Client) connectionString

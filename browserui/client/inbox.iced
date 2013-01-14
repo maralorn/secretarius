@@ -8,7 +8,7 @@ class InboxViewSlot extends ViewSlot
 
 class InboxView extends View
 	constructor: (@viewslot) ->
-		@inbox = window.model.inbox
+		@inbox = require("jsonmodel").inbox
 		@inbox.onChanged => @newInfo()
 		@newInfo()
 
