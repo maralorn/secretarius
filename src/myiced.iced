@@ -1,6 +1,8 @@
 a = (cb) -> do cb
 await a defer()
+
 module.exports = exports = iced
+exports.debugging = false
 
 exports.throw2cb = throw2cb = (func) ->
 	(args...) ->
@@ -31,6 +33,16 @@ exports.cb2throw = cb2throw = (cb) ->
 exports.throwError = throwError = (msg, data) ->
 	throw new Error "#{msg} #{if data? then JSON.stringify data else ''}"
 
+exports.debug = debug = (args...) ->
+	return unless exports.debugging
+	b = Error.prepareStackTrace
+	Error.prepareStackTrace = (_, stack) -> stack
+	e = new Error
+	Error.captureStackTrace e, this
+	s = e.stack
+	Error.prepareStackTrace = b
+	console.log.apply null, ["#{new Date().toString().match(/\d+:\d+:\d+/)[0]} #{s[1].getFunctionName()} #{s[1].getFileName()} #{s[1].getLineNumber()} |"].concat args
+
 __fd = iced.findDeferral
 
 iced.findDeferral = (args) ->
@@ -55,3 +67,4 @@ exports.pollute = (obj) ->
 	obj.f = throw2cb
 	obj.c = cb2throw
 	obj.e = throwError
+	obj.d = debug

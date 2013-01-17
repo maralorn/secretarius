@@ -1,5 +1,8 @@
 model = exports
 
+iced = require '../myiced'
+iced.pollute if window? then window else global
+
 model.getClassByType = (type) ->
 		for name, class_ of @
 			return class_ if name.toLowerCase() == type
@@ -53,19 +56,18 @@ class InfoCache
 	storeInfo: (values) ->
 		@infos[values.id]?._store values
 
-	getInformation: (cb, id) ->
+	getInformation: f (cb, id) ->
 		if @infos[id]?
 			if @infos[id].__lock?
 				@infos[id].__lock.push cb
 			else
-				cb null, @infos[id]
+				cb @infos[id]
 		else
 			@infos[id] = {__lock: [cb]}
-			await new model.Information(id).get defer error, values
-			if error? then cb error; return
+			await new model.Information(id).get c defer values
 			info = new (model.getClassByType values.type)(values.id)
 			info._store values
-			cb null, info for cb in @infos[id].__lock
+			cb info for cb in @infos[id].__lock
 			@registerInfo info
 
 model.cache = new InfoCache

@@ -1,4 +1,5 @@
 iced = require './myiced'
+iced.pollute global
 
 module.exports = (app, model, debug) ->
 
@@ -45,13 +46,10 @@ module.exports = (app, model, debug) ->
 		parse: (req, res, next) =>
 			return next() unless req.accepts("json")?
 	
-			if debug
-				num = Math.floor Math.random() * 1000
-				console.log "#{num}:\t#{req.method}\t#{req.url}\tquery:#{JSON.stringify req.query}\tbody:#{JSON.stringify req.body} {"
-
+			d req.method, req.url, req.query, req.body
 			respond = (code, msg) ->
 				res.json code, msg
-				console.log "#{num}:\t#{code}\t#{JSON.stringify msg} }" if debug
+				d msg
 
 			abort = (error) ->
 					respond 500,

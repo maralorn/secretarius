@@ -16,5 +16,6 @@ broadcast = (name) ->
 		for port in ports
 			port.postMessage msg
 
-new EventSource("/information/update").addEventListener 'message', broadcast('info'), false
-new EventSource("/inbox/update").addEventListener 'message', broadcast('inbox'), false
+sse = new EventSource("/sseupdate")
+sse.addEventListener 'infochange', broadcast('info'), false
+sse.addEventListener 'inboxchange', broadcast('inbox'), false

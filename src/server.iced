@@ -9,13 +9,12 @@ json = require './jsoninterface'
 sse = require './sse'
 
 
-debug = true
+iced.debugging = debug = true
 connectionString = "postgresql:///#{process.env.USER}-secretarius"
 
 app = do express
 
-if debug?
-	app.use express.logger()
+#app.use express.logger()
 
 app.use express.compress()
 app.use express.cookieParser()

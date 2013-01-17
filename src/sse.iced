@@ -1,25 +1,34 @@
 KEEPMSGS = 500
-TIMEOUT = 59000
+TIMEOUT = 119000
 
 iced = require './myiced'
 iced.pollute global
 
 module.exports = (app, model, debug) ->
+	sockets = 0
 	class Socket
-		constructor: (@req, @res, @client) ->
+		constructor: (@req, @res) ->
+			d ++sockets, 'sockets attached. (++)'
+			@clients = []
 			@req.socket.setTimeout Infinity
 			@res.writeHead 200,
 				"Content-Type": "text/event-stream"
 				"Cache-Control": "no-cache"
 				"Connection": "keep-alive"
-#			do empty = =>
-#				if @res?
-#					@res.write "\n"
-#					setTimeout empty, TIMEOUT
-			@client.registerSocket this
+			do empty = =>
+				if @res?
+					@res.write ":\n"
+					setTimeout empty, TIMEOUT
 			@req.on "close", =>
 				@res = null
-				@client.deregisterSocket @
+				d --sockets, 'sockets attached. (--)'
+				for client in @clients
+					client.deregisterSocket this
+
+		addClient: (client) ->
+			client.registerSocket this
+			@clients.push client
+			this
 
 		send: (event) ->
 			@res.write event
@@ -29,21 +38,19 @@ module.exports = (app, model, debug) ->
 		
 
 	class NotifyClient
-		constructor: ->
+		constructor: (@name) ->
 			@messageCount = 0
 			@messages = {}
 			@sockets = []
 
 		submit: (data) ->
-			@mesageCount++
-			@messages[@messageCount] = event = "id: #{@messageCount}\ndata: #{data}\n\n"
+			@messageCount++
+			@messages[@messageCount] = event = "event: #{@name}\nid: #{@messageCount}\ndata: #{data}\n\n"
 			socket.send event for socket in @sockets
 			if @messageCount > KEEPMSGS
 				delete @messages[@messageCount-KEEPMSGS]?
 			
 		registerSocket: (socket) ->
-			@sockets = (sock for sock in @sockets when sock isnt socket)
-			console.log @sockets.length, 'sockets attached. (++)' if debug
 			if (message = socket.lastId)? and message of @messages
 				while message <= @messageCount
 					socket.send @messages[message++]
@@ -51,11 +58,10 @@ module.exports = (app, model, debug) ->
 
 		deregisterSocket: (socket) ->
 			@sockets = (sock for sock in @sockets when sock isnt socket)
-			console.log @sockets.length, 'sockets attached. (--)' if debug
 
 	class SimpleNotifyClient extends NotifyClient
 		constructor: (event, callback) ->
-			super
+			super event
 			model.listen event, (error, msg) =>
 				if error? then console.log error; return
 				await callback msg.payload, defer error, data
@@ -73,8 +79,7 @@ module.exports = (app, model, debug) ->
 			size: answer.size
 			first: answer.first?.id
 	
-	app.get "/information/update", (req, res) ->
-		new Socket req, res, changeclient
-
-	app.get "/inbox/update", (req, res) ->
-		new Socket req, res, inboxclient
+	app.get "/sseupdate", (req, res) ->
+		new Socket(req, res)
+			.addClient(changeclient)
+			.addClient(inboxclient)
