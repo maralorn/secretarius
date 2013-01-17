@@ -1,4 +1,7 @@
 debug = true
+DEADTIME = 1500
+
+
 fs = require 'fs'
 {print} = require 'util'
 {spawn} = require 'child_process'
@@ -74,7 +77,7 @@ task 'stitch', 'Build secretarius.js from src/ and app/', ->
 				cp.apply null, files.concat ['buildapp', ->
 					stitch_.compile (error, js) ->
 						if error?
-							print error
+							console.log error
 						else
 							fs.writeFileSync "./lib/client/secretarius.js", (if debug then js else uglify.gen_code uglify.ast_squeeze uglify.ast_mangle parser.parse js), 'utf8'
 						rm 'buildapp']
@@ -83,9 +86,12 @@ task 'clear', 'Delete lib', ->
 	rm libdir
 
 task 'watch', 'Rebuild everything if change is noted', ->
-	invok 'build'
-	fs.watch './app', (event, filename) ->
-		invoke 'stitch'
-
-	fs.watch './src', (event, filename) ->
-		invoke 'build'
+	invoke 'build'
+	deadtime = false
+	fs.watch './src', cb = (event, filename) ->
+		if not /^\./.test(filename) and event is 'change' and not deadtime
+			deadtime = true
+			console.log 'rebuild everything', do new Date().toLocaleString
+			invoke 'build'
+			setTimeout (-> deadtime = false), DEADTIME
+	fs.watch './app', cb
