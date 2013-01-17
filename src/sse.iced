@@ -63,13 +63,13 @@ module.exports = (app, model, debug) ->
 		constructor: (event, callback) ->
 			super event
 			model.listen event, (error, msg) =>
-				if error? then console.log error; return
-				await callback msg.payload, defer error, data
-				if error? then console.log error; return
+				if error? then d error; return
+				await callback defer(error, data), msg.payload
+				if error? then d error; return
 				@submit data
 				
 	changeclient = new SimpleNotifyClient "infochange", f (autocb, msg) ->
-		await model.cache.getInformation c defer(info), msg
+		await model.cache.getInformation c(defer info), msg
 		await info.get c defer values
 		JSON.stringify values
 

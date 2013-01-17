@@ -86,12 +86,13 @@ task 'clear', 'Delete lib', ->
 	rm libdir
 
 task 'watch', 'Rebuild everything if change is noted', ->
-	invoke 'build'
 	deadtime = false
-	fs.watch './src', cb = (event, filename) ->
+	cb = (event, filename) ->
 		if not /^\./.test(filename) and event is 'change' and not deadtime
 			deadtime = true
 			console.log 'rebuild everything', do new Date().toLocaleString
 			invoke 'build'
 			setTimeout (-> deadtime = false), DEADTIME
-	fs.watch './app', cb
+	cb 'change', 'file'
+	for dir in ['./src', './app', './src/client', './src/models', './src/static']
+		fs.watch dir, cb

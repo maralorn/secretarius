@@ -14,7 +14,8 @@ module.exports = (connectionString) ->
 	listen = (channel, cb, finishcb) ->
 		client = new (pg.Client) connectionString
 		await client.connect defer()
-		client.on "notification", (msg) -> cb null, msg
+		client.on "notification", (msg) ->
+			cb null, msg
 		client.query "LISTEN #{channel};"
 		finishcb? -> client.end()
 
@@ -58,14 +59,14 @@ module.exports = (connectionString) ->
 		
 		queryOne: (cb, config) ->
 			await @queryMany defer(error, res), config
-			if error? then cb? error; return
+			if error? then cb error; return
 			unless res[0]? then cb {msg: "queryOne got no result.", config: config}; return
-			cb? null, res[0]
+			cb null, res[0]
 	
 		queryNone: (cb, config) ->
 			await @queryMany defer(error, res), config
 			if error? then cb? error; return
-			cb? null, null
+			cb null, null
 
 	class PGObject extends model.ModelObject
 
@@ -76,31 +77,29 @@ module.exports = (connectionString) ->
 #	after
 #	before
 #	expect
-		query: (cb, config) ->
+		query: f (autocb, config) ->
 			transaction = config.transaction
-			if transaction? then t = transaction else await t = new Transaction defer()
+			if transaction? then t = transaction else await t = new Transaction c defer()
 			if config.before?
-				await config.before.call @, defer(error), config, t
+				await config.before.call this, c(defer()), config, t
 				if error?
-					cb error
 					t.rollback() unless transaction?
-					return
+					throw error
 			await t[config.func] defer(error, res),
 				text: config.text
 				values: if config.values? then config.values else []
 			if error?
-				cb error
+				d error
 				t.rollback() unless transaction?
-				return
+				throw error
 			if config.after?
 				await config.after.call @, defer(error, result), res, t
 				res = result if result?
 				if error?
-					cb error
 					t.rollback() unless transaction?
-					return
+					throw error
 			t.commit() unless transaction?
-			cb null, res
+			res
 
 		queryNone: (cb, transaction, config) ->
 			config.transaction = transaction
@@ -170,20 +169,17 @@ module.exports = (connectionString) ->
 
 		get: (cb, t) ->
 			@queryOne cb, t,
-				before: (cb, config, t) ->
-					await @getType defer(error), t
+				before: f (autocb, config, t) ->
+					await @getType c defer(), t
 					config.text = "SELECT * FROM #{@type}view WHERE id=$1;"
-					cb error
 				values: [@id]
-				after: (cb, res, t) ->
-					await @getReferences defer(error, references), t
-					if error? then cb error; return
+				after: f (autocb, res, t) ->
+					await @getReferences c(defer references), t
 					res.references = references
-					await @getAttachments defer(error, attachments), t
-					if error? then cb error; return
+					await @getAttachments c(defer attachments), t
 					res.attachments = attachments
 					(@[key] = value) for key,value of res
-					cb null, res
+					res
 
 		setStatus: (cb, status, t) ->
 			@queryNone cb, t,

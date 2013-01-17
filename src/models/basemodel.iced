@@ -4,7 +4,7 @@ iced = require '../myiced'
 iced.pollute if window? then window else global
 
 model.getClassByType = (type) ->
-		for name, class_ of @
+		for name, class_ of this
 			return class_ if name.toLowerCase() == type
 
 model.extend = (obj) ->
@@ -28,7 +28,7 @@ model.ModelObject = class ModelObject
 	removeCb: (event, cb) ->
 		@_cbs[event] = (elem for elem in @_cbs[event] when elem isnt cb)
 		delete @_cbs[event] if @_cbs[event] == []
-		console.log event, "callback removed", @constructor.name
+		d event, "callback removed", @constructor.name
 
 	onChanged: (cb) ->
 		@on("changed", cb)
