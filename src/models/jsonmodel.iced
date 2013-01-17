@@ -1,13 +1,16 @@
 module.exports = model = require "basemodel"
 
-infocb = (event) ->
-	model.cache.storeInfo JSON.parse event.data
+updatecb = (event) ->
+	console.log event
+	switch event.data.name
+		when 'info'
+			model.cache.storeInfo event.data.data
+		when 'inbox'
+			model.inbox._store (-> return), event.data.data
 
-inboxcb = (event) ->
-	model.inbox._store (-> return), JSON.parse event.data
-
-new EventSource("/information/update").addEventListener "message", infocb
-new EventSource("/inbox/update").addEventListener "message", inboxcb
+port = new SharedWorker('worker.js').port
+port.addEventListener 'message', updatecb, false
+do port.start
 	
 class PGObject extends model.ModelObject
 	constructor: (@id) ->
@@ -274,6 +277,7 @@ class Inbox extends PGObject
 			await @_get defer(error, res), null, "inbox"
 			if error? then cb error; return
 			await @_store defer(error), res
+			if error? then cb error; return
 		cb null, @values
 
 	_store: (cb, @values) ->

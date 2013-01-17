@@ -1,0 +1,59 @@
+@bg_inactive: #00000f;
+@fg_inactive: #9999ff;
+@bg_focused: #000044;
+@fg_focused: #ffffff;
+@bg_active: #9999ee;
+@fg_active: #00000f;
+@bg_important: #ffffff;
+@fg_important: #f00000;
+@bg_code: #00000f;
+@fg_code: #ffff00;
+
+* {
+	padding:0;
+	margin:0;
+}
+
+@font-face {
+	font-family: baar_sophia;
+	src: url('Clockopia.ttf');
+}
+
+@font: baar_sophia, sans_serif;
+@fontsize: 0.8em;
+
+body{
+	background: @bg_inactive;
+	color: @fg_inactive;
+	font-size: @fontsize; font-family: @font;
+}
+
+#clock{
+	float: right;
+	padding: 0.2em;
+}
+h1{
+	margin: 0.2em;
+	padding: 0.5em;
+	font-size: 2*@fontsize;
+	float: left;
+	color: @fg_active;
+	background: @bg_active;
+}
+#content{
+	clear:both;
+}
+#menu {
+	> button{
+		fontsize: @fontsize; font-family: @font;
+		padding: 0.2em;
+		margin: 0.2em;
+		background: @bg_active;
+		border: 0.1em solid @bg_active;
+		color: @fg_active;
+		&:hover {
+			background: @bg_focused;
+			color: @fg_focused;
+		}
+	}	
+}

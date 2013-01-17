@@ -1,6 +1,4 @@
-#!/bin/zsh
-npm install
-npm update
+#!/bin/sh
 if [[ $1 == "clear" ]] {
 dropdb $USER-secretarius
 }

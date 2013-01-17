@@ -1,14 +1,15 @@
-{View, Draggable} = require("view")
-{ViewSlot} = require("slots")
-{InfoView} = require("info")
+model = require 'jsonmodel'
+iced = require 'myiced'
+iced.pollute window
+ui = require 'ui'
 
-class InboxViewSlot extends ViewSlot
+class InboxViewSlot extends Slot
 	constructor: (@title, @content) ->
 		
 
 class InboxView extends View
 	constructor: (@viewslot) ->
-		@inbox = require("jsonmodel").inbox
+		@inbox = model.inbox
 		@inbox.onChanged => @newInfo()
 		@newInfo()
 
@@ -35,8 +36,3 @@ class InboxView extends View
 		@draw()
 		if @info?
 			InfoView.create @infoslot, @info
-
-exports.InboxDraggable = class InboxDraggable extends Draggable
-
-	createView: (viewslot) ->
-		new InboxView(viewslot)

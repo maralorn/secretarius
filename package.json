@@ -3,6 +3,7 @@
   "description": "Tasks and Communication Manager",
   "version": "0.0.0",
   "author": "Malte Brandy <malte.brandy@maralorn.de>",
+  "main" : "./lib/server.js",
   "dependencies": {
 	"jade":">=0.27.6",
 	"express":">=3.0.0rc4",

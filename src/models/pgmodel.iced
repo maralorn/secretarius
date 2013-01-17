@@ -1,10 +1,15 @@
+pg = require 'pg'
+
+iced = require '../myiced'
+iced.pollute global
+
+model = require './basemodel'
+
 hash = do ->
 	crypto = require "crypto"
 	(key) -> crypto.createHash("md5").update(key).digest "base64"
 
-exports.connect = (connectionString) ->
-	pg = require "pg"
-	model = require "./basemodel"
+module.exports = (connectionString) ->
 
 	listen = (channel, cb, finishcb) ->
 		client = new (pg.Client) connectionString
@@ -14,11 +19,9 @@ exports.connect = (connectionString) ->
 		finishcb? -> client.end()
 
 	class Transaction
-		constructor: (cb) ->
-			await pg.connect connectionString, defer error, @client
-			if error? then cb error; return
-			@begin()
-			cb()
+		constructor: f (autocb) ->
+			await pg.connect connectionString, c defer @client
+			do @begin
 
 		begin: ->
 			@client.query "begin"

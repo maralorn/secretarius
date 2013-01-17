@@ -1,10 +1,4 @@
-{View, Draggable} = require("view")
-model = require "jsonmodel"
-
-getViewByType = (type) ->
-	view = viewByType[type]
-	unless view? then console.log "Type not found: #{type}"
-	return view
+model = require 'jsonmodel'
 
 infolabel = (info) ->
 	switch info.type
@@ -75,5 +69,7 @@ class NoteView extends InfoView
 	content: ->
 		@info.content
 
-viewByType =
-	note: NoteView
+	createView: (viewslot) ->
+		note = new (model.Note)
+		await note.create defer(error, id), ""
+		InfoView.create viewslot, note

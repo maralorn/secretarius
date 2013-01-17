@@ -1,18 +1,35 @@
-exports.ViewSlot = class ViewSlot
+model = require 'jsonmodel'
+iced = require 'myiced'
+iced.pollute window
+ui = require 'ui'
+
+exports.WindowSlot = class WindowSlot extends ui.Slot
+	constructor: ->
+		$('body').html require('template/body') {menu: ['Inbox', 'CreateNote']}
+		do clock = ->
+			await model.inbox.getSize defer error, size
+			$('#clock').html "#{do (new Date).toLocaleString} Inbox:#{size}"
+			setTimeout clock, 1
+		new ui.Emitter $("#menu > button:contains('Inbox')"), 'inbox'
+		do @clear
+	
+	clear: ->
+		super
+		@getContentNode().empty()
+		@setTitle 'Secretarius'
+	
 	getContentNode: ->
-		@content
-
-	getHeader: ->
-		@title
-
-	setContent: (html) ->
-		@content.html html
-
+		$('#content')
+	
 	setTitle: (title) ->
-		@title.html title
+		$('body > h1').html title
+		document.title = title
 
-
-exports.ContainerViewSlot = class ContainerViewSlot extends ViewSlot
+	close: ->
+		 window.open '', '_self', ''
+		 do window.close
+### 
+exports.ContainerViewSlot = class ContainerViewSlot extends Slot
 	constructor: (@container) ->
 		@id = @container.attr "id"
 		@container.data "slot", @
@@ -31,7 +48,7 @@ exports.ContainerViewSlot = class ContainerViewSlot extends ViewSlot
 		@content.css("height", @content.parent().innerHeight() - height - 6)
 		
 
-exports.TabViewSlot = class TabViewSlot extends ViewSlot
+exports.TabViewSlot = class TabViewSlot extends Slot
 	constructor: ->
 		@id = "Tab#{Math.floor Math.random() * 1000000000000000}"
 		$("#tabs > ul").append require("template/tabtitle").render
@@ -56,3 +73,4 @@ exports.TabViewSlot = class TabViewSlot extends ViewSlot
 
 	getHeader: ->
 		@title.parent()
+###
