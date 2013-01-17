@@ -48,7 +48,7 @@ task 'less', 'Compile less files from src/client/ to lib/client/', ->
 						fs.writeFileSync "./src/client/#{file}.css", css, 'utf8'
 
 task 'static', 'Copy static files from src/static/ to lib/static/', ->
-	for file in fs.readdirSync './scr/static/'
+	for file in fs.readdirSync './src/static/'
 		cp "src/static/#{file}", 'lib/client', null
 
 

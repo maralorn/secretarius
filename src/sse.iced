@@ -42,6 +42,8 @@ module.exports = (app, model, debug) ->
 				delete @messages[@messageCount-KEEPMSGS]?
 			
 		registerSocket: (socket) ->
+			@sockets = (sock for sock in @sockets when sock isnt socket)
+			console.log @sockets.length, 'sockets attached. (++)'
 			if (message = socket.lastId)? and message of @messages
 				while message <= @messageCount
 					socket.send @messages[message++]
@@ -49,6 +51,7 @@ module.exports = (app, model, debug) ->
 
 		deregisterSocket: (socket) ->
 			@sockets = (sock for sock in @sockets when sock isnt socket)
+			console.log @sockets.length, 'sockets attached. (--)'
 
 	class SimpleNotifyClient extends NotifyClient
 		constructor: (event, callback) ->
