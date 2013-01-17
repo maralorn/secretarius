@@ -1,3 +1,5 @@
+iced = require './myiced'
+
 module.exports = (app, model, debug) ->
 
 	class Parser

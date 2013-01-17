@@ -8,11 +8,6 @@ jade = require 'jade'
 {parser, uglify} = require 'uglify-js'
 iced__ = require 'iced-coffee-script'
 
-srcdir = './src/'
-clientsrcdir = './src/client/'
-staticdir = './src/static/'
-clientlibdir = './lib/client/'
-libdir = './lib/'
 appfiles = ['myiced', 'models/basemodel', 'models/jsonmodel']
 
 cp = (args..., cb) ->
@@ -43,18 +38,18 @@ task 'iced', 'Compile iced files from src/ to lib/', ->
 		print data.toString()
 	
 task 'less', 'Compile less files from src/client/ to lib/client/', ->
-	fs.readdir clientsrcdir, (err, files) ->
+	fs.readdir './src/client/', (err, files) ->
 		for filename in files
 			if (file = filename.match(/(\w*)\.less$/)?[1])?
-				less.render fs.readFileSync("#{clientsrcdir}#{file}.less", 'utf8'), {compress: not debug}, (error, css) ->
+				less.render fs.readFileSync("./src/client/#{file}.less", 'utf8'), {compress: not debug}, (error, css) ->
 					if error?
 						print error
 					else
-						fs.writeFileSync "#{clientlibdir}#{file}.css", css, 'utf8'
+						fs.writeFileSync "./src/client/#{file}.css", css, 'utf8'
 
 task 'static', 'Copy static files from src/static/ to lib/static/', ->
-	for file in fs.readdirSync staticdir
-		cp "#{staticdir}#{file}", clientlibdir, null
+	for file in fs.readdirSync './scr/static/'
+		cp "src/static/#{file}", 'lib/client', null
 
 
 task 'stitch', 'Build secretarius.js from src/ and app/', ->
@@ -73,18 +68,23 @@ task 'stitch', 'Build secretarius.js from src/ and app/', ->
 					filename: filename
 				module._compile "module.exports = #{content}", filename
 	rm 'buildapp', ->
-		files = ("#{srcdir}#{file}.iced" for file in appfiles)
+		files = ("./src/#{file}.iced" for file in appfiles)
 		cp 'app/', 'buildapp/', ->
 			cp 'vendor/', 'buildapp/lib/', ->
 				cp.apply null, files.concat ['buildapp', ->
 					stitch_.compile (error, js) ->
 						if error?
-							print "Create JS: #{error}"
+							print error
 						else
-							fs.writeFileSync "#{clientlibdir}secretarius.js", (if debug then js else uglify.gen_code uglify.ast_squeeze uglify.ast_mangle parser.parse js), 'utf8'
+							fs.writeFileSync "./lib/client/secretarius.js", (if debug then js else uglify.gen_code uglify.ast_squeeze uglify.ast_mangle parser.parse js), 'utf8'
 						rm 'buildapp']
 
 task 'clear', 'Delete lib', ->
 	rm libdir
 
 task 'watch', 'Rebuild everything if change is noted', ->
+	fs.watch './app', (event, filename) ->
+		invoke 'stitch'
+
+	fs.watch './src', (event, filename) ->
+		invoke 'build'

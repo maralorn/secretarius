@@ -47,5 +47,4 @@ app.use (req, res) ->
 		json: -> res.json 404, obj
 		html: ->	res.send 404, '<html><body><h1>404 - Not Found</h1></body></html>'
 
-
 http.createServer(app).listen if process.env.LISTEN_PID > 0 then 'systemd' else 3000
