@@ -83,6 +83,7 @@ task 'clear', 'Delete lib', ->
 	rm libdir
 
 task 'watch', 'Rebuild everything if change is noted', ->
+	invok 'build'
 	fs.watch './app', (event, filename) ->
 		invoke 'stitch'
 
