@@ -49,12 +49,12 @@ module.exports = (app, model, debug) ->
 			d req.method, req.url, req.query, req.body
 			respond = (code, msg) ->
 				res.json code, msg
-				d msg
 
 			abort = (error) ->
-					respond 500,
+				respond 500,
 					msg: "Internal Error"
 					error: error
+				d error
 			
 			await @findObject defer(error, object), req
 			return next() if error is 0

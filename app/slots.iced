@@ -5,24 +5,21 @@ ui = require 'ui'
 
 exports.WindowSlot = class WindowSlot extends ui.Slot
 	constructor: ->
-		$('body').html require('template/body') {menu: ['Inbox', 'CreateNote']}
-		do clock = ->
-			await model.inbox.getSize defer error, size
-			$('#clock').html "#{do (new Date).toLocaleString} Inbox:#{size}"
-			setTimeout clock, 1
-		new ui.Emitter $("#menu > button:contains('Inbox')"), 'inbox'
-		do @clear
-	
-	clear: ->
-		super
-		@getContentNode().empty()
-		@setTitle 'Secretarius'
-	
-	getContentNode: ->
-		$('#content')
+		menu = ['Inbox', 'CreateNote', 'Test', 'LongDish', 'VeryLongDish']
+		$('body').html require('template/body') {menu: menu}
+		for dish in menu
+			new ui.Emitter $("#menu > button:contains('#{dish}')"), do dish.toLowerCase
+		clock = ->
+			try
+				$('#clock').html "#{do (new Date).toLocaleString} Inbox:#{model.inbox.values.size}"
+			catch err
+				console.log err
+			setTimeout clock, 1000
+		model.inbox.getSize clock
+		super $('#content'), $('body > h1').first()
 	
 	setTitle: (title) ->
-		$('body > h1').html title
+		super
 		document.title = title
 
 	close: ->

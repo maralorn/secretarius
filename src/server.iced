@@ -4,6 +4,7 @@ require 'systemd'
 express = require 'express'
 
 iced = require './myiced'
+iced.pollute global
 pgmodel = require './models/pgmodel'
 json = require './jsoninterface'
 sse = require './sse'
@@ -15,21 +16,25 @@ connectionString = "postgresql:///#{process.env.USER}-secretarius"
 app = do express
 
 #app.use express.logger()
+app.use (req, res, next) ->
+	for i in req.accepted
+		switch i.subtype
+			when 'json'
+				req.url = "/json#{req.url}"
+				break
+			when 'html'
+				req.url = "/index.html"
+				break
+	do next
 
 app.use express.compress()
+app.use express.static "#{__dirname}/client"
 app.use express.cookieParser()
 app.use express.cookieSession
 	secret: "secret-#{Math.random()}"
 app.use express.bodyParser()
 
-app.use (req, res, next) ->
-	res.format
-		_default: -> do next
-		default: -> do next
-		json: -> req.url = "/json#{req.url}"; next()
-		html: -> req.url = '/index.html'; next()
 
-app.use express.static "#{__dirname}/client"
 
 app.use app.router
 

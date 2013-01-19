@@ -3,36 +3,25 @@ iced = require 'myiced'
 iced.pollute window
 ui = require 'ui'
 
-class InboxViewSlot extends Slot
-	constructor: (@title, @content) ->
-		
+class InboxView extends ui.View
+	@registerView /^inbox$/, this, f (autocb) -> 'Inbox'
 
-class InboxView extends View
-	constructor: (@viewslot) ->
-		@inbox = model.inbox
-		@inbox.onChanged => @newInfo()
-		@newInfo()
+	constructor: (@slot) ->
+		@size = @first = null
+		model.inbox.onChanged @draw
+		model.inbox.get @draw
+		@slot.setContent require("template/inbox").render()
+		@innerslot = new Slot do $('div', do @slot.getContentNode).first, do $('h1', do @slot.getContentNode).first
+	
+	delete: ->
+		model.inbox.removeCb 'changed', @draw
 
-	drawTitle: ->
-		@viewslot.setTitle "Inbox (#{@size})"
-
-	draw: ->
-		@drawTitle()
-		@viewslot.setContent require("template/inbox").render()
-		new InboxDraggable @viewslot.getHeader()
-		@infoslot = new InboxViewSlot $("h1", @viewslot.getContentNode()), $(".inboxcontent", @viewslot.getContentNode())
-		if @size is 0
-			$("a[href='#read']", @viewslot.getContentNode()).hide()
-		else
-			$("a[href='#read']", @viewslot.getContentNode()).click =>
-				@info?.setStatus "default"
-				return false
-
-	newInfo: ->
-		await @inbox.get defer error, res
-		if error? then alert(error); return
-		@size = res.size
-		@info = res.first
-		@draw()
-		if @info?
-			InfoView.create @infoslot, @info
+	draw: (values) =>
+		unless @size is values.size
+			@slot.setTitle "Inbox (#{@size = values.size})"
+		unless @first is values.first
+			@first = values.first
+			if @first?
+				@innerslot.setView "#{@first.type}:#{@first.id}"
+			else
+				do @innerslot.clear

@@ -23,7 +23,11 @@ continuationCatcher = (continuation, cb) ->
 			cb.__throw2cb error
 	
 
-exports.cb2throw = cb2throw = (cb) ->
+exports.cb2throw = cb2throw = (cb, args...) ->
+	for arg in args
+		if arg?
+			do console.trace
+			throwError 'cb2throw can only take one parameter.'
 	(args...) ->
 		if args[0]?
 			throw args[0]
@@ -41,7 +45,15 @@ exports.debug = debug = (args...) ->
 	Error.captureStackTrace e, this
 	s = e.stack
 	Error.prepareStackTrace = b
-	console.log.apply null, ["#{new Date().toString().match(/\d+:\d+:\d+/)[0]} #{s[1].getFunctionName()} #{s[1].getFileName()} #{s[1].getLineNumber()} |"].concat args
+	time = new Date().toString().match(/\d+:\d+:\d+/)[0]
+	file = s[1].getFileName().match(/\/(\w*).js$/)[1]
+	line = do s[1].getLineNumber
+	for i in s[1..]
+		func = do i.getFunctionName
+		if func? and not /throw2cb/.test func
+			break
+	func = func.replace /module.exports./, ''
+	console.log.apply null, ["#{time} #{func} in #{file} at #{line} |"].concat args
 
 __fd = iced.findDeferral
 

@@ -1,61 +1,72 @@
 exports.View = class View
-	@views: {}
+	_views = {}
 
-	@registerView: (regex, cls) ->
-		@views[regex] = cls
+	@registerView: (regex, cls, label) ->
+		_views[regex] = cls
+		cls.__label = label if label?
+	
+	@getLabel: f (cb, viewname) ->
+		[cls, params] = @_find viewname
+		if cls?.__label?
+			cls.__label c(cb), params
+		else
+			cb viewname
 
 	@create: (viewname, slot) ->
-		for regex, cls of @views
+		[cls, params] = @_find viewname
+		return new cls slot, params if cls?
+
+	@_find: (viewname) ->
+		for regex, cls of _views
 			params = viewname.match regex
-			return new cls slot, params if params?
+			return [cls, params] if params?
+		[null, null]
 
 exports.Slot = class Slot
+	constructor: (@contentNode, @titleNode) ->
+		@emitter = new Emitter do @getTitleNode
+		do @clear
+
 	setView: (viewname) ->
-		do @clear if @view?
+		do @clear
 		@view = View.create viewname, this
-		
-	setContent: (html) ->
-		getContentNode().html html
+		@emitter.setViewName viewname
 
 	setTitle: (title) ->
-		@title.html title
-	
+		@getTitleNode().html title
+		
+	setContent: (html) ->
+		@getContentNode().html html
+
+	getContentNode: ->
+		@contentNode
+
+	getTitleNode: ->
+		@titleNode
+
 	clear: ->
 		do @view?.delete
+		@getContentNode().empty()
+		@setTitle 'Secretarius'
 
 exports.Emitter = class Emitter
-	constructor: (@node, @viewName, @slotGenerator) ->
+	constructor: (@node, @slotGenerator) ->
 		@slotGenerator ?= do SlotGenerator.getDefault
 # TODO: Drag
 		@node.click =>
-			await @getViewName defer error, viewName
-			@slotGenerator.show viewName unless error?
-
-	getViewName: f (autocb) ->
-		@viewName
-
-	getInformation: f (autocb) ->
-		null
-
-class InfoEmitter extends Emitter
-	constructor: (node, @id, @type, slotGenerator) ->
-		super node, "#{@type}/#{@id}", slotGenerator
+			@slotGenerator.show do @getViewName
 	
-	createView: (viewslot) ->
-		InfoView.create viewslot, @info
+	setViewName: (@viewName) ->
 
-	getInformation: ->
-		@info
-
-exports.CreateEmitter = class CreateEmitter extends Emitter
-	constructor: (node, @createcallback, slotgenerator) ->
-
+	getViewName: ->
+		@viewName
+		
 exports.SlotGenerator = class SlotGenerator
-	default_ = null
+	_default = null
 	@setDefault: (generator) ->
-		default_ = generator
+		_default = generator
 	@getDefault: ->
-		default_
+		_default
 
 exports.WindowSlotGenerator = class WindowSlotGenerator extends SlotGenerator
 	show: (viewname) ->

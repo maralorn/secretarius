@@ -8,11 +8,6 @@ $ ->
 	slot = new WindowSlot()
 	if (request = document.URL.match(/https?:\/\/.*\/(.*)/)?[1])?
 		slot.setView request
-	await model.inbox.getFirst defer error, first
-	console.log first
-	first.onChanged (data) -> console.log data
-	
-
 	
 #	if /window/.test document.URL
 #		window.open "/", "mywindow","width=400,height=200,toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=no,copyhistory=no,resizable=no"

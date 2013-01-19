@@ -1,4 +1,4 @@
-debug = true
+debug = false
 DEADTIME = 1500
 
 
@@ -8,7 +8,6 @@ fs = require 'fs'
 less = require 'less'
 stitch = require 'stitch'
 jade = require 'jade'
-{parser, uglify} = require 'uglify-js'
 iced__ = require 'iced-coffee-script'
 
 appfiles = ['myiced', 'models/basemodel', 'models/jsonmodel']
@@ -48,12 +47,11 @@ task 'less', 'Compile less files from src/client/ to lib/client/', ->
 					if error?
 						print error
 					else
-						fs.writeFileSync "./src/client/#{file}.css", css, 'utf8'
+						fs.writeFileSync "./lib/client/#{file}.css", css, 'utf8'
 
 task 'static', 'Copy static files from src/static/ to lib/static/', ->
 	for file in fs.readdirSync './src/static/'
 		cp "src/static/#{file}", 'lib/client', null
-
 
 task 'stitch', 'Build secretarius.js from src/ and app/', ->
 	stitch_ = stitch.createPackage
@@ -70,6 +68,7 @@ task 'stitch', 'Build secretarius.js from src/ and app/', ->
 					pretty: debug
 					filename: filename
 				module._compile "module.exports = #{content}", filename
+	rm 'lib/client/secretarius.min.js'
 	rm 'buildapp', ->
 		files = ("./src/#{file}.iced" for file in appfiles)
 		cp 'app/', 'buildapp/', ->
@@ -79,8 +78,15 @@ task 'stitch', 'Build secretarius.js from src/ and app/', ->
 						if error?
 							console.log error
 						else
-							fs.writeFileSync "./lib/client/secretarius.js", (if debug then js else uglify.gen_code uglify.ast_squeeze uglify.ast_mangle parser.parse js), 'utf8'
-						rm 'buildapp']
+							fs.writeFileSync "./lib/client/secretarius.js", js, 'utf8'
+						fs.appendFileSync 'lib/client/secretarius.js', '\nrequire("secretarius");', 'utf8'
+						rm 'buildapp'
+						p = spawn 'node_modules/.bin/uglifyjs', ['lib/client/secretarius.js']
+						p.stderr.on 'data', (data) ->
+							process.stderr.write data.toString()
+						p.stdout.on 'data', (data) ->
+							fs.appendFileSync 'lib/client/secretarius.min.js', do data.toString, 'utf8'
+						]
 
 task 'clear', 'Delete lib', ->
 	rm libdir

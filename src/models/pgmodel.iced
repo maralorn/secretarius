@@ -33,7 +33,7 @@ module.exports = (connectionString) ->
 		rollback: ->
 			@client.query "rollback"
 
-		query: (cb, config) ->
+		query: f (autocb, config) ->
 			config.name = hash config.text
 			request = @client.query config
 			request.on "error", (error) ->
@@ -41,36 +41,31 @@ module.exports = (connectionString) ->
 					msg: "pgerror"
 					pgerror: error
 					query: config
-			cb null, request
+			request
 	
-		queryMany: (cb, config) ->
+		queryMany: f (autocb, config) ->
 			if config.cb?
 				callbackb = config.cb
 				delete config.cb
 			else
 				callback = (row, res) ->
 					res.addRow(row)
-			await @query defer(error, request), config
-			if error? then cb error; return
+			await @query c(defer request), config
 			request.on "row", callback
 			await request.on "end", defer res
-			if request.error? then cb request.error; return
-			cb null, res.rows
+			throw request.error if request.error?
+			res.rows
 		
-		queryOne: (cb, config) ->
-			await @queryMany defer(error, res), config
-			if error? then cb error; return
-			unless res[0]? then cb {msg: "queryOne got no result.", config: config}; return
-			cb null, res[0]
+		queryOne: f (autocb, config) ->
+			await @queryMany c(defer res), config
+			e 'queryOne got no result.', {config: config} unless res[0]?
+			res[0]
 	
-		queryNone: (cb, config) ->
-			await @queryMany defer(error, res), config
-			if error? then cb? error; return
-			cb null, null
+		queryNone: f (autocb, config) ->
+			await @queryMany c(defer res), config
+			null
 
 	class PGObject extends model.ModelObject
-
-
 #	text
 #	values
 #	transaction
@@ -80,24 +75,21 @@ module.exports = (connectionString) ->
 		query: f (autocb, config) ->
 			transaction = config.transaction
 			if transaction? then t = transaction else await t = new Transaction c defer()
+			check = (e) ->
+				if e?
+					do t.rollback unless transaction?
+					throw e
 			if config.before?
-				await config.before.call this, c(defer()), config, t
-				if error?
-					t.rollback() unless transaction?
-					throw error
+				await config.before.call this, defer(error), config, t
+				check error
 			await t[config.func] defer(error, res),
 				text: config.text
 				values: if config.values? then config.values else []
-			if error?
-				d error
-				t.rollback() unless transaction?
-				throw error
+			check error
 			if config.after?
-				await config.after.call @, defer(error, result), res, t
+				await config.after.call this, defer(error, result), res, t
+				check error
 				res = result if result?
-				if error?
-					t.rollback() unless transaction?
-					throw error
 			t.commit() unless transaction?
 			res
 
@@ -131,12 +123,11 @@ module.exports = (connectionString) ->
 			@queryOne cb, t,
 				text: "INSERT INTO information (status) VALUES ($1) RETURNING id;"
 				values: [status],
-				after: (cb, res, transaction) ->
+				after: f (autocb, res, transaction) ->
 					@id = res.id
 					if referencing?
-						await @addReference defer(error), referencing, transaction
-						if error? then cb error; return
-					cb null, @id
+						await @addReference c(defer()), referencing, transaction
+					@id
 
 		addReference: (cb, reference, t) ->
 			@queryNone cb, t,
@@ -154,23 +145,23 @@ module.exports = (connectionString) ->
 				text: "DELETE FROM information WHERE id=$1;"
 				values: [@id]
 
-		getType: (cb, t) ->
+		getType: f (cb, t) ->
 			if @type?
-				cb? null, @type
+				cb @type
 			else
-				@queryOne cb, t,
+				@queryOne c(cb), t,
 					text: "SELECT type FROM type WHERE id=$1;"
 					values: [@id]
-					after: (cb, res) ->
+					after: f (autocb, res) ->
 						if res?
-							cb null, (@type = res.type)
+							@type = res.type
 						else
-							cb {msg: "Couldnt get Type.", id: @id}
+							e 'Couldnt get Type.', {id: @id}
 
 		get: (cb, t) ->
 			@queryOne cb, t,
 				before: f (autocb, config, t) ->
-					await @getType c defer(), t
+					await @getType c(defer()), t
 					config.text = "SELECT * FROM #{@type}view WHERE id=$1;"
 				values: [@id]
 				after: f (autocb, res, t) ->
@@ -201,30 +192,30 @@ module.exports = (connectionString) ->
 				text: "DELETE FROM attachments WHERE id=$1 AND fileid=$2);"
 				values: [@id, file.id]
 
-		_set: (cb, table, map, allowed, t) ->
+		_set: f (autocb, table, map, allowed, t) ->
 			answers = {}
 			errors = {}
 			await for key, value of map
 				if not allowed? or key in allowed
-					@queryNone defer(errors[key]), t,
+					@queryNone c(defer()), t,
 						text: "UPDATE #{table} SET $2=$3 WHERE id=$1;"
 						values: [@id, key, value],
-			cb errors, answers
+			null
 
 		getReferences: (cb, t) ->
 			@queryMany cb, t,
 				text: "SELECT referenceid FROM \"references\" WHERE id=$1;"
 				values: [@id]
-				after: (cb, res) -> cb null, (row.referenceid for row in res)
+				after: f (autocb, res) -> (row.referenceid for row in res)
 
 		getAttachments: (cb, t) ->
 			@queryMany cb, t,
 				text: "SELECT fileid FROM attachments WHERE id=$1;"
 				values: [@id]
-				after: (cb, res) -> cb null, (row.fileid for row in res)
+				after: f (autocb, res) -> (row.fileid for row in res)
 
 		_store: (values) ->
-			@change(values)
+			@change values
 
 
 	class File extends PGObject
@@ -233,13 +224,13 @@ module.exports = (connectionString) ->
 			@queryOne cb, t,
 				text: "INSERT INTO file (name) VALUES ($1) RETURNING id;"
 				values: [name]
-				after: (cb, res) -> cb null, @id = res.id
+				after: f (autocb, res) -> @id = res.id
 			
 		getName: (cb, t) ->
 			@queryOne cb, t,
 				text: "SELECT name FROM file WHERE id=$1;"
 				values: [@id]
-				after: (cb, res) -> cb null, res.name
+				after: f (autocb, res) -> res.name
 
 		delete: (cb, t)->
 			@queryNone cb, t,
@@ -251,12 +242,11 @@ module.exports = (connectionString) ->
 
 		create: (cb, content, t) ->
 			@queryNone cb, t,
-				before: (cb, config, t) ->
-					await Note.__super__.create.call @, defer(error), "inbox", null, t
+				before: f (autocb, config, t) ->
+					await Note.__super__.create.call this, c(defer()), "inbox", null, t
 					config.values = [@id, content]
-					cb error
 				text: "INSERT INTO note (id, content) VALUES ($1, $2);"
-				after: (cb) -> cb(null, @id)
+				after: f (autocb) -> @id
 
 		setContent: (cb, content, t) ->
 			@queryNone cb, t,
@@ -268,12 +258,11 @@ module.exports = (connectionString) ->
 
 		create: (cb, description, referencing=null, t) ->
 			@queryNone cb, t,
-				before: (cb, config, t) ->
-					await super defer(error), "default", referencing, t
+				before: f (autocb, config, t) ->
+					await Task.__super.create.call this, c(defer()), "default", referencing, t
 					config.values = [@id, content]
-					cb(error)
 				text: "INSERT INTO task (id, description) VALUES ($1, $2);"
-				after: (cb) -> cb(null, @id)
+				after: f (autocb) -> @id
 
 		done: (cb, t) ->
 			@queryNone cb, t,
@@ -289,12 +278,11 @@ module.exports = (connectionString) ->
 
 		create: (cb, description, referencing=null, parent=null, t) ->
 			@queryNone cb, t,
-				before: (cb, config, t) ->
-					await super defer(error), description, referencing, t
+				before: f (autocb, config, t) ->
+					await super c(defer()), description, referencing, t
 					config.values = [@id, if parent? then parent.id else null]
-					cb(error)
 				text: "INSERT INTO project (id, parent) VALUES ($1, $2);"
-				after: (cb) -> cb(null, @id)
+				after: f (autocb) -> @id
 
 		setParent: (cb, parent, t) ->
 			@queryNone cb, t,
@@ -320,12 +308,11 @@ module.exports = (connectionString) ->
 
 		create: (cb, description, list, referencing=null, project=null, t) ->
 			@queryNone cb, t,
-				before: (cb, config, t) ->
-					super defer(error), description, referencing, t
+				before: f (autocb, config, t) ->
+					super c(defer()), description, referencing, t
 					config.values = [@id, list.id, if project? then project.id else null]
-					cb(error)
 				text: "INSERT INTO asap (id, asaplist, project) VALUES ($1, $2, $3);"
-				after: (cb) -> cb(null, @id)
+				after: f (autocb) -> @id
 
 		setProject: (cb, project, t) ->
 			@queryNone cb, t,
@@ -529,12 +516,12 @@ module.exports = (connectionString) ->
 		getSize: (cb, t) ->
 			@queryOne cb, t,
 				text: "SELECT count(*) FROM inbox;"
-				after: (cb, res) -> cb null, res.count
+				after: f (autocb, res) -> res.count
 
 		getFirst: (cb, t) ->
 			@queryMany cb, t,
 				text: "SELECT id FROM inbox ORDER BY created_at LIMIT 1;"
-				after: (cb, res) -> cb null, if res[0]?.id? then new Information(res[0].id) else null
+				after: f (autocb, res) -> if res[0]?.id? then new Information(res[0].id) else null
 
 		get: (cb, t) ->
 			answer = {}
