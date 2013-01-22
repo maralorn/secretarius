@@ -1,8 +1,7 @@
 iced = require './myiced'
-iced.pollute global
+iced.util.pollute global
 
 module.exports = (app, model, debug) ->
-
 	class Parser
 		constructor: ->
 			@methods = {}
@@ -22,17 +21,18 @@ module.exports = (app, model, debug) ->
 			for method, handler of tree
 				registerMethod method, handler
 
-		findObject: (cb, req) ->
+		findObject: func (autocb, req) ->
 			type = req.params.type
 			cls = model.getClassByType type
-			if type in ["inbox", "urgent", "maybe"]
-				cb null, model[type]
+			if type in ['inbox', 'urgent', 'maybe']
+				model[type]
 			else if cls? and (id = req.params.id)?
-				model.cache.getInformation cb, id
+				await model.cache.getInformation defer(info), id
+				info
 			else if cls? and req.method == "POST"
-				cb null, new cls
+				new cls
 			else
-				cb 0
+				null
 
 		findMethod: (req, object) ->
 			switch req.method
@@ -57,12 +57,12 @@ module.exports = (app, model, debug) ->
 				d error
 			
 			await @findObject defer(error, object), req
-			return next() if error is 0
 			return abort error if error?
+			return do next if object is null
 			method = @findMethod req, object
 			return abort error if error?
 			handler = @methods[method]
-			return next() unless handler?
+			return do next unless handler?
 			if handler.before?
 				await handler.before defer(error, args), req
 				return abort error if error?
@@ -74,7 +74,7 @@ module.exports = (app, model, debug) ->
 			if handler.after?
 				await handler.after defer(error, result), result
 				return abort error if error?
-			respond 200, if result? then result else {msg: "success"}
+			respond 200, result or {msg: "success"}
 			
 	parser = new Parser
 
@@ -84,7 +84,7 @@ module.exports = (app, model, debug) ->
 		after: (cb, ans) -> cb null, {type: ans}
 
 	parser.registerMethod model.Information.prototype.setStatus,
-		before: (cb, req) -> cb null, [req.body.status]
+		before: func (autocb, req) -> [req.body.status]
 
 	parser.registerMethod model.Information.prototype.addReference,
 		before: (cb, req)	->
@@ -95,8 +95,11 @@ module.exports = (app, model, debug) ->
 		before: (cb, req) -> cb null, [new Date(req.body.delay)]
 
 	parser.registerMethod model.Note.prototype.create,
-		before: (cb, req) -> cb null, [req.body.content]
+		before: con = func (autocb, req) -> [req.body.content]
 		after: afterOnPost
+	
+	parser.registerMethod model.Note.prototype.setContent,
+		before: con
 		
 	parser.registerMethod model.inbox.getFirst,
 		after: (cb, ans) -> cb null, if ans? then {first: ans.id} else {msg: "inbox is empty"}

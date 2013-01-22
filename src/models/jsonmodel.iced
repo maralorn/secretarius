@@ -1,7 +1,9 @@
 module.exports = model = require "basemodel"
 
+iced = require 'myiced'
+iced.util.pollute window
+
 updatecb = (event) ->
-	console.log event
 	switch event.data.name
 		when 'info'
 			model.cache.storeInfo event.data.data
@@ -9,7 +11,7 @@ updatecb = (event) ->
 			model.inbox._store (-> return), event.data.data
 
 port = new SharedWorker('worker.js').port
-port.addEventListener 'message', updatecb, false
+port.addEventListener 'message', updatecb
 do port.start
 	
 class PGObject extends model.ModelObject
@@ -260,32 +262,23 @@ class Maybe extends PGObject
 	getList: ->
 
 class Inbox extends PGObject
-	getSize: (cb) ->
-		unless @values?
-			await @get defer(error)
-			if error? then cb error; return
-		cb null, @values.size
+	getSize: func (autocb) ->
+		await @get defer()
+		@values.size
 
-	getFirst: (cb) ->
-		unless @values?
-			await @get defer(error)
-			if error? then cb error; return
-		cb null, @values.first
+	getFirst: func (autocb) ->
+		await @get defer()
+		@values.first
 
-	get: (cb) ->
+	get: singlify func (autocb) ->
 		unless @values?
-			await @_get defer(error, res), null, "inbox"
-			if error? then cb error; return
-			await @_store defer(error), res
-			if error? then cb error; return
-		cb null, @values
+			await @_get defer(res), null, "inbox"
+			await @_store defer(), res
+		@values
 
-	_store: (cb, @values) ->
-		if @values.first? then await model.cache.getInformation defer(error, @values.first), @values.first
-		if error? then cb error; return
+	_store: func (autocb, @values) ->
+		if @values.first? then await model.cache.getInformation defer(@values.first), @values.first
 		@change @values
-		cb()
-
 
 class Urgent extends PGObject
 	 getSize: ->

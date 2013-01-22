@@ -1,17 +1,19 @@
 model = require 'jsonmodel'
+
 iced = require 'myiced'
-iced.pollute window
+iced.util.pollute window
+
 ui = require 'ui'
 
 class InboxView extends ui.View
-	@registerView /^inbox$/, this, f (autocb) -> 'Inbox'
+	@registerView /^inbox$/, this, func (autocb) -> 'Inbox'
 
 	constructor: (@slot) ->
 		@size = @first = null
 		model.inbox.onChanged @draw
-		model.inbox.get @draw
-		@slot.setContent require("template/inbox").render()
-		@innerslot = new Slot do $('div', do @slot.getContentNode).first, do $('h1', do @slot.getContentNode).first
+		model.inbox.get (err) -> console.log err if err?
+		@slot.setContent do require "template/inbox"
+		@innerslot = new ui.Slot do $('div', do @slot.getContentNode).first, do $('h1', do @slot.getContentNode).first
 	
 	delete: ->
 		model.inbox.removeCb 'changed', @draw

@@ -1,26 +1,32 @@
 model = require 'jsonmodel'
 iced = require 'myiced'
-iced.pollute window
+iced.util.pollute window
 ui = require 'ui'
 
 exports.WindowSlot = class WindowSlot extends ui.Slot
 	constructor: ->
+		model.inbox.get -> return
 		menu = ['Inbox', 'CreateNote', 'Test', 'LongDish', 'VeryLongDish']
 		$('body').html require('template/body') {menu: menu}
 		for dish in menu
-			new ui.Emitter $("#menu > button:contains('#{dish}')"), do dish.toLowerCase
+			emitter = new ui.Emitter $("#menu > button:contains('#{dish}')")
+			emitter.setViewName do dish.toLowerCase
+		$clock = $('#clock')
+		do $clock.hide
 		clock = ->
+			do runclock
 			try
-				$('#clock').html "#{do (new Date).toLocaleString} Inbox:#{model.inbox.values.size}"
+				do $clock.show
+				$clock.html "#{do (new Date).toLocaleString} Inbox:#{model.inbox.values.size}"
 			catch err
-				console.log err
-			setTimeout clock, 1000
-		model.inbox.getSize clock
-		super $('#content'), $('body > h1').first()
+				do $clock.hide
+				console.log 'No clock update.'
+		do runclock = -> setTimeout clock, 1000 - do new Date().getTime % 1000
+		super $('#content'), do $('#header > h1').first
 	
 	setTitle: (title) ->
 		super
-		document.title = title
+		document.title = "#{title} - Secretarius"
 
 	close: ->
 		 window.open '', '_self', ''

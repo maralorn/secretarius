@@ -4,13 +4,12 @@ require 'systemd'
 express = require 'express'
 
 iced = require './myiced'
-iced.pollute global
+iced.util.pollute global
 pgmodel = require './models/pgmodel'
 json = require './jsoninterface'
 sse = require './sse'
 
-
-iced.debugging = debug = true
+do iced.util.enableDebugMode if debug = true
 connectionString = "postgresql:///#{process.env.USER}-secretarius"
 
 app = do express

@@ -1,25 +1,32 @@
+iced = require 'myiced'
+iced.util.pollute window
+
+model = require 'jsonmodel'
+
 exports.View = class View
-	_views = {}
+	_views = []
 
 	@registerView: (regex, cls, label) ->
-		_views[regex] = cls
-		cls.__label = label if label?
+		_views.push
+			regex: regex
+			cls: cls
+			label: label
 	
-	@getLabel: f (cb, viewname) ->
-		[cls, params] = @_find viewname
-		if cls?.__label?
-			cls.__label c(cb), params
+	@getLabel: func (cb, viewname) ->
+		[row, params] = @_find viewname
+		if row?.label?
+			row.label c(cb), params
 		else
 			cb viewname
 
 	@create: (viewname, slot) ->
-		[cls, params] = @_find viewname
-		return new cls slot, params if cls?
+		[row, params] = @_find viewname
+		new row.cls slot, params if row?
 
 	@_find: (viewname) ->
-		for regex, cls of _views
-			params = viewname.match regex
-			return [cls, params] if params?
+		for row in _views
+			params = row.regex.exec viewname
+			return [row, params] if params?
 		[null, null]
 
 exports.Slot = class Slot
@@ -44,9 +51,9 @@ exports.Slot = class Slot
 	getTitleNode: ->
 		@titleNode
 
-	clear: ->
+	clear: =>
 		do @view?.delete
-		@getContentNode().empty()
+		do @getContentNode().empty
 		@setTitle 'Secretarius'
 
 exports.Emitter = class Emitter
@@ -72,3 +79,21 @@ exports.WindowSlotGenerator = class WindowSlotGenerator extends SlotGenerator
 	show: (viewname) ->
 		window.open "#{document.URL.match(/https?:\/\/.*\//)[0]}#{viewname}", '', 'toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=no,copyhistory=no'
 	@setDefault new this
+
+exports.id2viewname = func (autocb, id) ->
+	await model.cache.getInformation defer(info), id
+	exports.info2viewname info
+	
+exports.info2viewname = (info) ->
+	"#{info.type}:#{info.id}"
+
+exports.id2label = func (cb, id) ->
+	await exports.id2viewname defer(viewname), id
+	exports.label c(cb), viewname
+
+exports.label = (cb, viewname) ->
+	View.getLabel cb, viewname
+	
+exports.inbox = require 'inbox'
+exports.slots = require 'slots'
+exports.info = require 'info'

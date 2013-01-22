@@ -1,13 +1,13 @@
-@bg_inactive: #00000f;
-@fg_inactive: #9999ff;
-@bg_focused: #000044;
-@fg_focused: #ffffff;
-@bg_active: #9999ee;
-@fg_active: #00000f;
-@bg_important: #ffffff;
-@fg_important: #f00000;
-@bg_code: #00000f;
-@fg_code: #ffff00;
+@bg1: #9999ee;
+@fg1: #00000f;
+@bg2: #000044;
+@fg2: #ffffff;
+@bg3: #00000f;
+@fg3: #9999ff;
+@bgimportant: #ffffff;
+@fgimportant: #f00000;
+@bgcode: #00000f;
+@fgcode: #ffff00;
 
 * {
 	padding:0;
@@ -23,8 +23,8 @@
 @fontsize: 0.8em;
 
 body{
-	background: @bg_inactive;
-	color: @fg_inactive;
+	background: @bg3;
+	color: @fg3;
 	font-size: @fontsize; font-family: @font;
 }
 
@@ -33,28 +33,64 @@ body{
 	padding: 0.2em;
 }
 h1{
-	margin: 0.2em;
 	padding: 0.5em;
+	margin-right: 0.5em;
 	font-size: 2*@fontsize;
+	color: @fg3;
+	background: @bg3;
 	float: left;
-	color: @fg_active;
-	background: @bg_active;
+	#header > & {
+		color: @fg1;
+		background: @bg1;
+	}
 }
-#content{
-	background: @bg_active;
+textarea{
+	border:0px;
+	color: @fg3;
+	background: @bg3;
+	outline: none;
+	resize: none;
+	width: 100%;
+	overflow: hidden;
+	vertical-align: top;
+	-webkit-transition: height 0.5s;
+}
+#content, #header, #footer{
+	padding: 0.2em;
+	margin: 0.5em;
+	background: @bg2;
+	color: @fg2;
 	clear:both;
+	overflow: auto;
+	-webkit-transition: height 0.2s;
 }
+.button {
+	display: inline-block;
+	text-decoration: none;
+	fontsize: @fontsize; font-family: @font;
+	padding: 0.2em 0.4em;
+	margin-right: 0.5em;
+	background: @bg3;
+	border: 0.1em solid @bg3;
+	color: @fg3;
+	&:hover {
+		background: @bg1;
+		color: @fg1;
+	}
+}
+#content a{
+	.button;
+}
+
 #menu {
 	> button{
-		fontsize: @fontsize; font-family: @font;
-		padding: 0.2em;
-		margin: 0.2em;
-		background: @bg_active;
-		border: 0.1em solid @bg_active;
-		color: @fg_active;
+		.button;
+		background: @bg1;
+		border: 0.1em solid @bg1;
+		color: @fg1;
 		&:hover {
-			background: @bg_focused;
-			color: @fg_focused;
+			background: @bg3;
+			color: @fg3;
 		}
 	}	
 }

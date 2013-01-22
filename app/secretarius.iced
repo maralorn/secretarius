@@ -1,11 +1,11 @@
 require "lib/jquery"
 require "lib/jade"
+require "lib/jquery.autosize-min"
 
-{WindowSlot} = require 'slots'
-model = require 'jsonmodel'
+ui = require 'ui'
 
 $ ->
-	slot = new WindowSlot()
+	slot = new ui.slots.WindowSlot()
 	if (request = document.URL.match(/https?:\/\/.*\/(.*)/)?[1])?
 		slot.setView request
 	

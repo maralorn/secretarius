@@ -1,7 +1,7 @@
 model = exports
 
 iced = require '../myiced'
-iced.pollute if window? then window else global
+iced.util.pollute if window? then window else global
 
 model.getClassByType = (type) ->
 		for name, class_ of this
@@ -15,7 +15,7 @@ model.ModelObject = class ModelObject
 	on: (event, cb) ->
 		@_cbs = {} unless @_cbs?
 		@_cbs[event] = [] unless @_cbs[event]?
-		@_cbs[event].push cb
+		@_cbs[event].push cb unless cb in @_cbs[event]
 	
 	emit: (event, data) ->
 		if @_cbs?[event]?
@@ -56,18 +56,26 @@ class InfoCache
 	storeInfo: (values) ->
 		@infos[values.id]?._store values
 
-	getInformation: f (cb, id) ->
-		if @infos[id]?
-			if @infos[id].__lock?
-				@infos[id].__lock.push cb
-			else
-				cb @infos[id]
-		else
-			@infos[id] = {__lock: [cb]}
-			await new model.Information(id).get c defer values
-			info = new (model.getClassByType values.type)(values.id)
+#	getInformation: func (cb, id) ->
+#		if @infos[id]?
+#			if @infos[id].__lock?
+#				@infos[id].__lock.push cb
+#			else
+#				cb @infos[id]
+#		else
+#			@infos[id] = {__lock: [cb]}
+#			await new model.Information(id).get c defer values
+#			info = new (model.getClassByType values.type)(values.id)
+#			info._store values
+#			cb info for cb in @infos[id].__lock
+#			@registerInfo info
+
+	getInformation: singlify func (autocb, id) ->
+		unless @infos[id]?
+			await new model.Information(id).get defer(values)
+			info = new (model.getClassByType values.type) values.id
 			info._store values
-			cb info for cb in @infos[id].__lock
 			@registerInfo info
+		@infos[id]
 
 model.cache = new InfoCache

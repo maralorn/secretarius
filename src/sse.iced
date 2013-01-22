@@ -2,7 +2,7 @@ KEEPMSGS = 500
 TIMEOUT = 119000
 
 iced = require './myiced'
-iced.pollute global
+iced.util.pollute global
 
 module.exports = (app, model, debug) ->
 	sockets = 0
@@ -68,13 +68,13 @@ module.exports = (app, model, debug) ->
 				if error? then d error; return
 				@submit data
 				
-	changeclient = new SimpleNotifyClient "infochange", f (autocb, msg) ->
-		await model.cache.getInformation c(defer info), msg
-		await info.get c defer values
+	changeclient = new SimpleNotifyClient "infochange", func (autocb, msg) ->
+		await model.cache.getInformation defer(info), msg
+		await info.get defer values
 		JSON.stringify values
 
-	inboxclient = new SimpleNotifyClient "inboxchange", f (autocb, msg) ->
-		await model.inbox.get c defer answer
+	inboxclient = new SimpleNotifyClient "inboxchange", func (autocb, msg) ->
+		await model.inbox.get defer answer
 		JSON.stringify
 			size: answer.size
 			first: answer.first?.id
