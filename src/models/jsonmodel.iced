@@ -6,7 +6,7 @@ iced.util.pollute window
 updatecb = (event) ->
 	switch event.data.name
 		when 'info'
-			model.cache.storeInfo event.data.data
+			model.cache.updateInfo event.data.data
 		when 'inbox'
 			model.inbox._store (-> return), event.data.data
 		when 'deleted'
@@ -15,6 +15,14 @@ updatecb = (event) ->
 port = new SharedWorker('worker.js').port
 port.addEventListener 'message', updatecb
 do port.start
+	
+getInfos = (cb, cls, filter, params = {}) ->
+	params.filter = filter
+	new cls()._get ((error, list) ->
+		unless error?
+			for values in list
+				model.cache.storeInfo values
+		cb error, list), params
 	
 class PGObject extends model.ModelObject
 	constructor: (@id) ->

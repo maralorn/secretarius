@@ -3,6 +3,8 @@ model = exports
 iced = require '../myiced'
 iced.util.pollute if window? then window else global
 
+model.UUID_REG = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/
+
 model.getClassByType = (type) ->
 		for name, class_ of this
 			return class_ if name.toLowerCase() is type
@@ -58,15 +60,22 @@ class InfoCache
 		if info.id? and @infos[info.id]?
 			delete @infos[info.id]
 
-	storeInfo: (values) ->
-		@infos[values.id]?._store values
+	updateInfo: (values) ->
+		@storeInfo values, true
+
+	storeInfo: (values, mustExist = false) ->
+		unless (info = @infos[values.id])? or mustExist
+			info = new (model.getClassByType values.type) values.id
+			@registerInfo info
+		info?._store values
 
 	getInformation: singlify func (autocb, id) ->
-		unless @infos[id]?
-			await new model.Information(id).get defer(values)
-			info = new (model.getClassByType values.type) values.id
-			info._store values
-			@registerInfo info
-		@infos[id]
+		if id? and model.UUID_REG.test id
+			unless @infos[id]?
+				await new model.Information(id).get defer(values)
+				@storeInfo values
+			@infos[id]
+		else
+			null
 
 model.cache = new InfoCache

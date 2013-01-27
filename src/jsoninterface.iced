@@ -1,8 +1,6 @@
 iced = require './myiced'
 iced.util.pollute global
 
-UUID = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/
-
 module.exports = (app, model) ->
 	class Parser
 		constructor: ->
@@ -26,7 +24,7 @@ module.exports = (app, model) ->
 			if type in ['inbox', 'urgent', 'maybe']
 				model[type]
 			else if cls?
-				if UUID.test id
+				if model.UUID_REG.test id
 					await model.cache.getInformation defer(info), id
 					info
 				else if req.method == "POST"
