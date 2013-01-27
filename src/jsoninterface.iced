@@ -126,6 +126,16 @@ module.exports = (app, model) ->
 		after: (cb, ans) -> cb null, {size: ans.size, first: ans.first?.id}
 	},{
 		method: model.Information::get
+	},{
+		method: model.AsapList.getAll
+	},{
+		method: model.AsapList::create
+		before: name = func (autocb, req) ->
+			debug req.body.name
+			[req.body.name]
+	},{
+		method: model.AsapList::rename
+		before: name
 	}
 
 	app.all "/json/:type/:id", parser.parse

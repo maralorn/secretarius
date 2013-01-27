@@ -3,8 +3,8 @@ form(name='note')
 	input(name='note')
 	button(type='submit') New Note
 h2 ToDo Lists
-each entry in lists
-	button(name=entry)= entry
+each list in lists
+	button(name=list.id)= list.name
 form(name='list')
 	input(name='list')
 	button(type='submit') New ToDo List

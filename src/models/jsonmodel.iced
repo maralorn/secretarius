@@ -145,14 +145,23 @@ class Asap extends Task
 	setProject: (project) ->
 	setList: (list) ->
 	@getAllFromList: (list) ->
-	@getAll: () ->
+	@getAll: (cb) ->
+		new this()._get cb,
+			filter: 'all'
 
-class AsapList extends PGObject
-	create: (name) ->
-	rename: (name) ->
-	delete: ->
-	@getByName: (name) =>
-	@getAll: ->
+class AsapList extends Information
+	create: (cb, name) ->
+		@_create cb,
+			name: name
+
+	rename: (cb, name) ->
+		@_patch cb,
+			method: "rename"
+			name: name
+
+	@getAll: (cb) ->
+		new this()._get cb,
+			filter: 'all'
 
 class SocialEntity extends Information
 	create: ->

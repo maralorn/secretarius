@@ -112,3 +112,17 @@ class NoteView extends InfoView
 				msg.html 'Save failed!'
 			else
 				msg.html 'Saved!'
+
+class AsapListView extends InfoView
+	@registerView /^asaplist:(.*)$/, this, func (autocb, match) ->
+		await model.cache.getInformation defer(list), match[1]
+		"ToDo List: #{list.name}"
+
+	drawTitle: ->
+		@slot.setTitle @info.name
+
+	drawContent: ->
+
+	initContent: ->
+
+	save: ->

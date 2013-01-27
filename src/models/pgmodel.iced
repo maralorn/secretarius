@@ -341,31 +341,26 @@ module.exports = (connectionString) ->
 
 	class AsapList extends Information
 
-		create: (cb, name, t) =>
+		create: (cb, name, t) ->
 			queryNone cb, t,
 				before: func (autocb, config, t) =>
-					await Information::create.call this, defer(), 'default', referencing, t
+					await Information::create.call this, defer(), 'default', null, t
+					debug name
 					config.values = [@id, name]
-				text: 'INSERT INTO task (id, description) VALUES ($1, $2);'
+				text: 'INSERT INTO asaplist (id, name) VALUES ($1, $2);'
 				after: func (autocb) => @id
 
-		rename: (cb, name, t) =>
+		rename: (cb, name, t) ->
 			queryNone cb, t,
 				text: 'UPDATE asaplist SET name=$2 WHERE id=$1;'
 				values: [@id, name]
 
-		delete: (cb, t) =>
+		delete: (cb, t) ->
 			queryNone cb, t,
 				text: 'DELETE FROM asaplist WHERE id=$1;'
 				values: [@id]
 
-		@getByName: (cb, name, t) =>
-			queryOne cb, t,
-				text: 'SELECT id FROM asaplist WHERE name=$1;'
-				values: [name]
-				after: func (autocb, res) -> new this res.id
-
-		@getAll: (cb, t) ->
+		@getAll: (cb, t) =>
 			queryMany cb, t,
 				text: 'SELECT id, name FROM asaplist;'
 		###
