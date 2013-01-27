@@ -11,38 +11,37 @@ exports.InfoView = class InfoView extends ui.View
 		@id = match[1]
 		@slot.setContent do require "template/infoframe"
 		@contentNode = $('.infocontent', @context)
-		$(".setStatus > a", @context).click (ev) ->
-			info.setStatus ( -> return), $(this).attr("href")
-			return false
-#		$(".setStatus > a[href='#{@info.status}']", context).addClass("button-selected")
-#		$("form.delay > input.date", context).datepicker({dateFormat: "dd.mm.yy"})
-#		$("form.delay", context).submit ->
-#			date = $(".date", @).val()
-#			unless date == ''
-#				regex=/(\d{2})\.(\d{2})\.(\d{4})/
-#				[date, day, month, year] = regex.exec date
-#				min = $(".minute", @).val()
-#				hour = $(".hour", @).val()
-#				date = new Date(year, parseInt(month)-1, day, parseInt(hour)+1, min)
-#				info.setDelay (-> return), date
-#			return false
-		@refContainer = $(".referenceContainer", @context)
-#		$(".references", context).droppable
-#			drop: (event, ui) =>
-#				info = ui.draggable.data("dragobject").getInformation()
-#				if info?
-#					@info.addReference (-> return), info
-
-		await model.cache.getInformation c(defer @info), @id
+		await model.cache.getInformation defer(error, @info), @id
 		@info.onChanged @draw
-		@info.onDeleted @slot.clear
+		@info.onDeleted @delcb = => do @slot.clear
 		info = @info
-
+		$(".setStatus > button", @context).click (ev) ->
+			do ev.preventDefault
+			status = $(this).attr 'name'
+			unless status is 'delete' and not confirm 'Really delete?'
+				info.setStatus (->), status
+		do (@savebutton = $('button[name=save]', @context)).hide
+		@delayPicker = new ui.TimePicker $('.delay'),
+			name: 'Delay'
+			change: (date) => info.setDelay (->), date
+		@savebutton.click (ev) =>
+			do ev.preventDefault
+			@clean true
+		new ui.Uploader $('.upload', @context)
+		@refContainer = $('.referenceContainer', @context)
+		new ui.DropArea $('.references', @context), (viewname) ->
+			if (id = /^\w*:(.*)$/.exec(viewname)?[1])?
+				await model.cache.getInformation defer(error, reference), id
+				unless error?
+					await info.addReference defer(error), reference
+				if error?
+					console.log error
 		do @initContent
 		do @draw
 
-	delete: ->
+	delete: =>
 		@info.removeCb 'changed', @draw
+		@info.removeCb 'deleted', @delcb
 
 	draw: =>
 		do @drawTitle
@@ -51,26 +50,42 @@ exports.InfoView = class InfoView extends ui.View
 	
 	dirty: =>
 		@dirtStamp = do new Date().getTime
-		setTimeout @clean, 2000
+		@savebutton.show 400
+		setTimeout @clean, 5000
 	
-	clean: =>
-		
-		if do new Date().getTime - @dirtStamp >= 2000
+	clean: (force) =>
+		if @dirtStamp? and (do new Date().getTime - @dirtStamp >= 5000 or force)
 			do @save
+			@dirtStamp = null
+			@savebutton.hide 1000
 	
 	drawFrame: ->
+		$(".setStatus > button", @context).removeClass 'active'
+		$(".setStatus > button[name=#{@info.status}]", @context).addClass 'active'
+		$("span.created_at", @context).attr 'x-time', @info.created_at
+		$("span.last_edited", @context).attr 'x-time', @info.last_edited
+		@delayPicker.setDate @info.delay
 		do @refContainer.empty
 		for referenceid in @info.references
-			await ui.id2viewname c(defer viewname), referenceid
-			await ui.label c(defer label), viewname
-			domnode = $(require("template/infolabel") label)
+			await model.cache.getInformation catchNull(defer info), referenceid
+			domnode = $('<span />')
 			domnode.appendTo @refContainer
-			new Emitter domnode, viewname
+			info.onChanged setLabel = (values) =>
+				await ui.id2label catchNull(defer label), values.id
+				domnode.html "#{label}<button>x</button>"
+				$('button', domnode).click values, (ev) =>
+					do ev.preventDefault
+					do ev.stopPropagation
+					@info.removeReference (->), ev.data
+			setLabel info
+			info.onDeleted -> do domnode.remove
+			emitter = new ui.Emitter domnode
+			emitter.setViewName ui.info2viewname info
 		
 class NoteView extends InfoView
 	@registerView /^note:(.*)$/, this, func (autocb, match) ->
 		await model.cache.getInformation defer(note), match[1]
-		note.content
+		"Note: #{note.content}"
 
 	drawTitle: ->
 		@slot.setTitle 'Note'
@@ -86,11 +101,13 @@ class NoteView extends InfoView
 		@area.autosize
 			append: '\n'
 		@area.keyup @dirty
+		@area.change @dirty
 
 	save: ->
 		unless @info.content is do @area.val
+			msg = ui.message 'Saving…'
 			await @info.setContent defer(error), do @area.val
 			if error?
-				console.log 'save failed'
+				msg.html 'Save failed!'
 			else
-				console.log 'saved'
+				msg.html 'Saved!'

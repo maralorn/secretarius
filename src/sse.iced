@@ -4,11 +4,11 @@ TIMEOUT = 119000
 iced = require './myiced'
 iced.util.pollute global
 
-module.exports = (app, model, debug) ->
+module.exports = (app, model) ->
 	sockets = 0
 	class Socket
 		constructor: (@req, @res) ->
-			d ++sockets, 'sockets attached. (++)'
+			debug ++sockets, 'sockets attached. (++)'
 			@clients = []
 			@req.socket.setTimeout Infinity
 			@res.writeHead 200,
@@ -21,7 +21,7 @@ module.exports = (app, model, debug) ->
 					setTimeout empty, TIMEOUT
 			@req.on "close", =>
 				@res = null
-				d --sockets, 'sockets attached. (--)'
+				debug --sockets, 'sockets attached. (--)'
 				for client in @clients
 					client.deregisterSocket this
 
@@ -63,15 +63,20 @@ module.exports = (app, model, debug) ->
 		constructor: (event, callback) ->
 			super event
 			model.listen event, (error, msg) =>
-				if error? then d error; return
+				if error? then debug error; return
 				await callback defer(error, data), msg.payload
-				if error? then d error; return
+				if error? then debug error; return
 				@submit data
 				
 	changeclient = new SimpleNotifyClient "infochange", func (autocb, msg) ->
 		await model.cache.getInformation defer(info), msg
 		await info.get defer values
 		JSON.stringify values
+
+	deleteclient = new SimpleNotifyClient "infodeleted", func (autocb, msg) ->
+		console.log 'delete', msg
+		JSON.stringify
+			id: msg
 
 	inboxclient = new SimpleNotifyClient "inboxchange", func (autocb, msg) ->
 		await model.inbox.get defer answer
@@ -83,3 +88,4 @@ module.exports = (app, model, debug) ->
 		new Socket(req, res)
 			.addClient(changeclient)
 			.addClient(inboxclient)
+			.addClient(deleteclient)

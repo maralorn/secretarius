@@ -19,3 +19,4 @@ broadcast = (name) ->
 sse = new EventSource("/sseupdate")
 sse.addEventListener 'infochange', broadcast('info'), false
 sse.addEventListener 'inboxchange', broadcast('inbox'), false
+sse.addEventListener 'infodeleted', broadcast('deleted'), false

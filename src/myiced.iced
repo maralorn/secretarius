@@ -15,6 +15,8 @@ class ErrorHandler
 				catcher error
 				return
 			catch error
+		error.stack = [] unless error.stack?
+		error.stack.push errString()
 		@cb error
 
 exports.throw2cb = throw2cb = (func) ->
@@ -42,7 +44,6 @@ continuationCatcher = (errorHandler, continuation) ->
 
 exports.cb2throw = cb2throw = (cb, args...) ->
 	handler = @.__errorHandler
-	do console.trace unless handler?
 	for arg in args
 		if arg?
 			do console.trace
@@ -125,8 +126,7 @@ exports.util.throwError = throwError = (msg, data) ->
 debugOn = false
 exports.util.enableDebugMode = () -> debugOn = true
 
-exports.debug = debug = (args...) ->
-	return unless debugOn
+errString = ->
 	b = Error.prepareStackTrace
 	Error.prepareStackTrace = (_, stack) -> stack
 	e = new Error
@@ -134,15 +134,17 @@ exports.debug = debug = (args...) ->
 	s = e.stack
 	Error.prepareStackTrace = b
 	time = new Date().toString().match(/\d+:\d+:\d+/)[0]
-	file = s[1].getFileName().match(/\/(\w*).\w*$/)[1]
-	line = do s[1].getLineNumber
-	for i in s[1..]
+	file = s[2].getFileName().match(/\/(\w*).\w*$/)[1]
+	line = do s[2].getLineNumber
+	for i in s[2..]
 		func = do i.getFunctionName
 		if func? and not /throw2cb/.test func
 			break
 	func = func.replace /module.exports./, ''
-	console.log.apply null, ["#{time} #{func} in #{file} at #{line} |"].concat args
-
+	"#{time} #{func} in #{file} at #{line}"
+exports.debug = debug = (args...) ->
+	return unless debugOn
+	console.log.apply null, [errString()].concat args
 
 exports.util.pollute = pollute = (obj) ->
 	obj.func = throw2cb
@@ -150,5 +152,5 @@ exports.util.pollute = pollute = (obj) ->
 	obj.addNull = addNull
 	obj.catchCB = addCatcher
 	obj.throwError = throwError
-	obj.d = debug
+	obj.debug = debug
 	obj.singlify = singlify

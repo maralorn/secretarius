@@ -10,10 +10,10 @@ class InboxView extends ui.View
 
 	constructor: (@slot) ->
 		@size = @first = null
-		model.inbox.onChanged @draw
-		model.inbox.get (err) -> console.log err if err?
 		@slot.setContent do require "template/inbox"
 		@innerslot = new ui.Slot do $('div', do @slot.getContentNode).first, do $('h1', do @slot.getContentNode).first
+		model.inbox.onChanged @draw
+		model.inbox.get (err, values) => unless err? then @draw values
 	
 	delete: ->
 		model.inbox.removeCb 'changed', @draw

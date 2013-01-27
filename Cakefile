@@ -55,7 +55,7 @@ task 'static', 'Copy static files from src/static/ to lib/static/', ->
 
 task 'stitch', 'Build secretarius.js from src/ and app/', ->
 	stitch_ = stitch.createPackage
-		paths: ['buildapp']
+		paths: ['buildapp', 'vendor']
 		compilers:
 			iced: (module, filename) ->
 				content = iced__.compile fs.readFileSync(filename, 'utf8'),
@@ -72,21 +72,20 @@ task 'stitch', 'Build secretarius.js from src/ and app/', ->
 	rm 'buildapp', ->
 		files = ("./src/#{file}.iced" for file in appfiles)
 		cp 'app/', 'buildapp/', ->
-			cp 'vendor/', 'buildapp/lib/', ->
-				cp.apply null, files.concat ['buildapp', ->
-					stitch_.compile (error, js) ->
-						if error?
-							console.log error
-						else
-							fs.writeFileSync "./lib/client/secretarius.js", js, 'utf8'
-						fs.appendFileSync 'lib/client/secretarius.js', '\nrequire("secretarius");', 'utf8'
-						rm 'buildapp'
-						p = spawn 'node_modules/.bin/uglifyjs', ['lib/client/secretarius.js']
-						p.stderr.on 'data', (data) ->
-							process.stderr.write data.toString()
-						p.stdout.on 'data', (data) ->
-							fs.appendFileSync 'lib/client/secretarius.min.js', do data.toString, 'utf8'
-						]
+			cp.apply null, files.concat ['buildapp', ->
+				stitch_.compile (error, js) ->
+					if error?
+						console.log error
+					else
+						fs.writeFileSync "./lib/client/secretarius.js", js, 'utf8'
+					fs.appendFileSync 'lib/client/secretarius.js', '\nrequire("secretarius");', 'utf8'
+					rm 'buildapp'
+					p = spawn 'node_modules/.bin/uglifyjs', ['lib/client/secretarius.js']
+					p.stderr.on 'data', (data) ->
+						process.stderr.write data.toString()
+					p.stdout.on 'data', (data) ->
+						fs.appendFileSync 'lib/client/secretarius.min.js', do data.toString, 'utf8'
+					]
 
 task 'clear', 'Delete lib', ->
 	rm libdir
@@ -100,5 +99,5 @@ task 'watch', 'Rebuild everything if change is noted', ->
 			invoke 'build'
 			setTimeout (-> deadtime = false), DEADTIME
 	cb 'change', 'file'
-	for dir in ['./src', './app', './src/client', './src/models', './src/static']
+	for dir in ['./src', './app', './app/template', './src/client', './src/models', './src/static']
 		fs.watch dir, cb

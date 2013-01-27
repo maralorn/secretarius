@@ -63,7 +63,7 @@ module.exports = (connectionString) ->
 		
 		queryOne: func (autocb, config) ->
 			await @queryMany defer(res), config
-			e 'queryOne got no result.', {config: config} unless res[0]?
+			throwError 'queryOne got no result.', {config: config} unless res[0]?
 			res[0]
 	
 		queryNone: func (autocb, config) ->
@@ -137,14 +137,9 @@ module.exports = (connectionString) ->
 
 
 		removeReference: (cb, reference, t) ->
-			@query cb, t,
+			@queryNone cb, t,
 				text: 'DELETE FROM "references" WHERE id=$1 AND referenceid=$2'
 				values: [@id, reference.id]
-
-		delete: (cb, t) ->
-			@query cb, t,
-				text: 'DELETE FROM information WHERE id=$1;'
-				values: [@id]
 
 		getType: func (cb, t) ->
 			if @type?
@@ -181,7 +176,7 @@ module.exports = (connectionString) ->
 		setDelay: (cb, delay, t) ->
 			@queryNone cb, t,
 				text: "UPDATE information SET status='inbox', delay=$2 WHERE id=$1;"
-				values: [@id, delay.toISOString()]
+				values: [@id, if delay? then do delay.toISOString else null]
 
 		attach: (cb, file, t) ->
 			@queryNone cb, t,
@@ -341,7 +336,7 @@ module.exports = (connectionString) ->
 			@queryOne cb, t,
 				text: 'INSERT INTO asaplist (name) VALUES ($1) RETURNING id;'
 				values: [name]
-				after: (cb, res) -> cb null, (@id = res.id)
+				after: func (autocb, res) -> @id = res.id
 
 		rename: (cb, name, t) ->
 			@queryNone cb, t,
@@ -357,7 +352,7 @@ module.exports = (connectionString) ->
 			@queryOne cb, t,
 				text: 'SELECT id FROM asaplist WHERE name=$1;'
 				values: [name]
-				after: (cb, res) -> cb null, new @ res.id
+				after: func (autocb, res) -> new this res.id
 
 		@getAll: (cb, t) ->
 			@queryMany cb, t,

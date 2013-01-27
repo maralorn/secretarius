@@ -1,14 +1,13 @@
-require "lib/jquery"
-require "lib/jade"
-require "lib/jquery.autosize-min"
+require "jquery"
+require "jade"
+require "jquery.autosize-min"
+require "date.extensions"
 
 ui = require 'ui'
 
 $ ->
-	slot = new ui.slots.WindowSlot()
-	if (request = document.URL.match(/https?:\/\/.*\/(.*)/)?[1])?
-		slot.setView request
-	
+	request = document.URL.match(/https?:\/\/.*\/(.*)/)?[1]
+	slot = new ui.slots.WindowSlot(request)
 #	if /window/.test document.URL
 #		window.open "/", "mywindow","width=400,height=200,toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=no,copyhistory=no,resizable=no"
 #		window.open('', '_self', '')

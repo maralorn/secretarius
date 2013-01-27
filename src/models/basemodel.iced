@@ -28,7 +28,7 @@ model.ModelObject = class ModelObject
 	removeCb: (event, cb) ->
 		@_cbs[event] = (elem for elem in @_cbs[event] when elem isnt cb)
 		delete @_cbs[event] if @_cbs[event] == []
-		d event, "callback removed", @constructor.name
+		debug event, "callback removed", @constructor.name
 
 	onChanged: (cb) ->
 		@on("changed", cb)
@@ -49,26 +49,17 @@ class InfoCache
 	registerInfo: (info) ->
 		@infos[info.id] = info
 
+	delete: (id) ->
+		if @infos[id]?
+			do @infos[id].delete
+			@unregisterInfo @infos[id]
+
 	unregisterInfo: (info) ->
 		if info.id? and @infos[info.id]?
 			delete @infos[info.id]
 
 	storeInfo: (values) ->
 		@infos[values.id]?._store values
-
-#	getInformation: func (cb, id) ->
-#		if @infos[id]?
-#			if @infos[id].__lock?
-#				@infos[id].__lock.push cb
-#			else
-#				cb @infos[id]
-#		else
-#			@infos[id] = {__lock: [cb]}
-#			await new model.Information(id).get c defer values
-#			info = new (model.getClassByType values.type)(values.id)
-#			info._store values
-#			cb info for cb in @infos[id].__lock
-#			@registerInfo info
 
 	getInformation: singlify func (autocb, id) ->
 		unless @infos[id]?

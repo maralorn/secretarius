@@ -4,17 +4,24 @@ iced.util.pollute window
 ui = require 'ui'
 
 exports.WindowSlot = class WindowSlot extends ui.Slot
-	constructor: ->
+	constructor: (viewname) ->
 		model.inbox.get -> return
-		menu = ['Inbox', 'CreateNote', 'Test', 'LongDish', 'VeryLongDish']
-		$('body').html require('template/body') {menu: menu}
+		menu = ['inbox', '']
+		labels = {}
+		await for dish in menu
+			ui.label defer(error, labels[dish]), dish
+		$('body').html require('template/body') {menu: (labels[dish] for dish in menu)}
 		for dish in menu
-			emitter = new ui.Emitter $("#menu > button:contains('#{dish}')")
-			emitter.setViewName do dish.toLowerCase
+			emitter = new ui.Emitter $("#menu > button:contains('#{labels[dish]}')")
+			emitter.setViewName dish
 		$clock = $('#clock')
 		do $clock.hide
 		clock = ->
 			do runclock
+			$('span.reltime').each ->
+				node = $(this)
+				node.html new Date(1000 * node.attr 'x-time').toRelativeTime
+					nowThreshold: 3000
 			try
 				do $clock.show
 				$clock.html "#{do (new Date).toLocaleString} Inbox:#{model.inbox.values.size}"
@@ -23,6 +30,11 @@ exports.WindowSlot = class WindowSlot extends ui.Slot
 				console.log 'No clock update.'
 		do runclock = -> setTimeout clock, 1000 - do new Date().getTime % 1000
 		super $('#content'), do $('#header > h1').first
+		WindowSlot.__super__.setView.call this, viewname
+		new ui.DropArea do $('#header > h1').first, @setView
+		
+	setView: (viewname) =>
+		window.location.href = "http://#{window.location.host}/#{viewname}"
 	
 	setTitle: (title) ->
 		super

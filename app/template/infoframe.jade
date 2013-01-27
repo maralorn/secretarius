@@ -1,20 +1,20 @@
 .setStatus
-	a(href="default") Normal
-	a(href="maybe") Maybe
-	a(href="inbox") Inbox
-	a(href="urgent") Urgent
-form.delay
-	input(type="text", size="10", value="dd.mm.yyyy").date
-	input(type="text", size="2", value="00").hour
-	| :
-	input(type="text", size="2", value="00").minute
-	input(type="submit", value="Delay")
+	button(name='delete') Delete
+	button(name='default') Normal
+	button(name='maybe') Maybe
+	button(name='inbox') Inbox
+	button(name='urgent') Urgent
+.delay
 .infocontent
-.attachments
-	h2 Attachments
-	form
-		input(type="file")
-		input(type="submit", value="Upload File")
+button(name='save') Save
+.times
+	| Last Change:
+	span.reltime.last_edited
+	| Created:
+	span.reltime.created_at
 .references
 	h2 References
 	.referenceContainer
+.attachments
+	h2 Attachments
+	.upload

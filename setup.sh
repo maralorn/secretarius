@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/zsh
 if [[ $1 == "clear" ]] {
 dropdb $USER-secretarius
 }

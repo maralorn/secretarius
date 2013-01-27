@@ -1,7 +1,7 @@
 iced = require './myiced'
 iced.util.pollute global
 
-module.exports = (app, model, debug) ->
+module.exports = (app, model) ->
 	class Parser
 		constructor: ->
 			@methods = {}
@@ -46,7 +46,7 @@ module.exports = (app, model, debug) ->
 		parse: (req, res, next) =>
 			return next() unless req.accepts("json")?
 	
-			d req.method, req.url, req.query, req.body
+			debug req.method, req.url, req.query, req.body
 			respond = (code, msg) ->
 				res.json code, msg
 
@@ -54,7 +54,7 @@ module.exports = (app, model, debug) ->
 				respond 500,
 					msg: "Internal Error"
 					error: error
-				d error
+				debug error
 			
 			await @findObject defer(error, object), req
 			return abort error if error?
@@ -70,6 +70,8 @@ module.exports = (app, model, debug) ->
 				params = [defer(error, result)]
 				params = params.concat args if args?
 				method.apply object, params
+			if handler.catcher? and error?
+				error = handler.catcher error
 			return abort error if error?
 			if handler.after?
 				await handler.after defer(error, result), result
@@ -87,12 +89,16 @@ module.exports = (app, model, debug) ->
 		before: func (autocb, req) -> [req.body.status]
 
 	parser.registerMethod model.Information.prototype.addReference,
-		before: (cb, req)	->
-			await model.cache.getInformation defer(error, reference), req.body.reference
-			cb error, [reference]
+		before: ref = func (autocb, req)	->
+			await model.cache.getInformation defer(reference), req.body.reference
+			[reference]
+		catcher: (error) -> unless error.msg is 'pgerror' and error.pgerror.code is '23505' then error else null
+
+	parser.registerMethod model.Information.prototype.removeReference,
+		before: ref
 
 	parser.registerMethod model.Information.prototype.setDelay,
-		before: (cb, req) -> cb null, [new Date(req.body.delay)]
+		before: (cb, req) -> cb null, [if req.body.delay isnt '' then new Date req.body.delay else null]
 
 	parser.registerMethod model.Note.prototype.create,
 		before: con = func (autocb, req) -> [req.body.content]

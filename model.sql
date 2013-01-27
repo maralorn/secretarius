@@ -21,9 +21,14 @@ CREATE TYPE status AS ENUM ('delete', 'maybe', 'default', 'inbox', 'urgent');
 CREATE TABLE information(
 	id          uuid PRIMARY KEY DEFAULT uuid(),
 	status      status DEFAULT 'default' NOT NULL,
-	delay   timestamp,
-	last_edited timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	created_at   timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+	delay   timestamptz,
+	last_edited timestamptz DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	created_at   timestamptz DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE deleted(
+	id     uuid PRIMARY KEY DEFAULT uuid(),
+	time   timestamptz DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE TABLE "references"(
@@ -51,7 +56,7 @@ CREATE TABLE note(
 CREATE TABLE task(
 	id   uuid PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
 	description varchar NOT NULL,
-	completed   timestamp
+	completed   timestamptz
 );
 
 CREATE TABLE project(
@@ -122,14 +127,13 @@ CREATE TABLE addresses(
 );
 
 CREATE TABLE appointment(
-	id   uuid PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
+	id          uuid PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
 	startdate   date   NOT NULL,
-	enddate   date,
-	time   time,
-	length   interval,
-	description   varchar NOT NULL,
-	placeid   uuid REFERENCES place(id),
-	timezone   varchar 
+	enddate     date,
+	time        time with time zone,
+	length      interval,
+	description varchar NOT NULL,
+	placeid     uuid REFERENCES place(id)
 );
 
 CREATE TYPE exception_move AS ENUM('no', 'before', 'after');
@@ -299,6 +303,10 @@ CREATE VIEW "inbox" AS
 	SELECT * 
 		FROM infoview WHERE status >= 'inbox' AND (delay <= CURRENT_TIMESTAMP OR delay is NULL);
 
+CREATE VIEW "urgent" AS
+	SELECT * 
+		FROM inbox WHERE status >= 'urgent';
+
 
 CREATE VIEW "maybe" AS
 	SELECT *
@@ -335,21 +343,39 @@ CREATE VIEW "noteview" AS
 DROP FUNCTION set_timestamp() CASCADE;
 CREATE FUNCTION set_timestamp() RETURNS trigger AS $$
 	plan = SD.setdefault("plan", plpy.prepare("UPDATE information SET last_edited=CURRENT_TIMESTAMP WHERE id=$1", ["uuid"]))
-	id = TD["new"]["id"]
+	if 'DELETE' == TD['event']:
+		id = TD['old']['id']
+	else:
+		id = TD['new']['id']
 	plpy.execute(plan, [id])
 	return "OK";
 $$ LANGUAGE plpythonu;
 
-CREATE TRIGGER infochange AFTER UPDATE ON information FOR EACH ROW WHEN (OLD.last_edited = NEW.last_edited) EXECUTE PROCEDURE set_timestamp();
+DROP FUNCTION delete() CASCADE;
+CREATE FUNCTION delete() RETURNS trigger AS $$
+	id = TD["new"]["id"]
+	plan1 = plpy.prepare("DELETE FROM information WHERE id=$1;", ["uuid"])
+	plan2 = plpy.prepare("INSERT INTO deleted (id) VALUES ($1);", ["uuid"])
+	plpy.execute(plan1, [id])
+	plpy.execute(plan2, [id])
+	plpy.execute("NOTIFY infodeleted, '"+id+"';")
+	return "OK";
+$$ LANGUAGE plpythonu;
+
+CREATE TRIGGER delete AFTER UPDATE ON information FOR EACH ROW WHEN (NEW.status = 'delete') EXECUTE PROCEDURE delete();
+
+CREATE TRIGGER infochange AFTER UPDATE ON information FOR EACH ROW WHEN (OLD.last_edited = NEW.last_edited AND NEW.status != 'delete') EXECUTE PROCEDURE set_timestamp();
 
 CREATE TRIGGER notechange AFTER UPDATE ON note FOR EACH ROW EXECUTE PROCEDURE set_timestamp();
-CREATE TRIGGER referenceschange AFTER INSERT ON "references" FOR EACH ROW EXECUTE PROCEDURE set_timestamp();
+CREATE TRIGGER referencesinsertion AFTER INSERT ON "references" FOR EACH ROW EXECUTE PROCEDURE set_timestamp();
+CREATE TRIGGER referencesdeletion AFTER DELETE ON "references" FOR EACH ROW EXECUTE PROCEDURE set_timestamp();
 
 DROP FUNCTION inboxchange() CASCADE;
 CREATE FUNCTION inboxchange() RETURNS trigger AS $$
 	plpy.execute("NOTIFY inboxchange;")
 	return "OK";
 $$ LANGUAGE plpythonu;
+
 CREATE TRIGGER inboxchange AFTER UPDATE ON information FOR EACH ROW WHEN ((OLD.status >= 'inbox' AND NEW.status < 'inbox') OR (OLD.status < 'inbox' AND NEW.status >= 'inbox')) EXECUTE PROCEDURE inboxchange();
 CREATE TRIGGER inboxinsert AFTER INSERT ON information FOR EACH ROW WHEN (NEW.status >= 'inbox') EXECUTE PROCEDURE inboxchange();
 

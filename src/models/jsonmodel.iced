@@ -9,6 +9,8 @@ updatecb = (event) ->
 			model.cache.storeInfo event.data.data
 		when 'inbox'
 			model.inbox._store (-> return), event.data.data
+		when 'deleted'
+			model.cache.delete event.data.data.id
 
 port = new SharedWorker('worker.js').port
 port.addEventListener 'message', updatecb
@@ -66,9 +68,6 @@ class Information extends PGObject
 			method: "removeReference"
 			reference: reference.id
 		
-	delete: (cb) ->
-		@_delete cb
-
 	getType: (cb) ->
 		unless @type?
 			await @_get cb,
@@ -110,6 +109,9 @@ class Information extends PGObject
 	_url: -> "#{if @type? then @type else "information"}#{if @id? then "/#{@id}" else ""}"
 
 	_store: (values) ->
+		for key,value of values
+			switch key
+				when 'delay' then if value? then values[key] = new Date value
 		@values = values
 		(@[key] = value) for key,value of values
 		@change values
