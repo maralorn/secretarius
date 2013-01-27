@@ -24,10 +24,9 @@ exports.WindowSlot = class WindowSlot extends ui.Slot
 					nowThreshold: 3000
 			try
 				do $clock.show
-				$clock.html "#{do (new Date).toLocaleString} Inbox:#{model.inbox.values.size}"
+				$clock.html "#{new Date.toLocaleString()} Inbox:#{model.inbox.values.size}"
 			catch err
 				do $clock.hide
-				console.log 'No clock update.'
 		do runclock = -> setTimeout clock, 1000 - do new Date().getTime % 1000
 		super $('#content'), do $('#header > h1').first
 		WindowSlot.__super__.setView.call this, viewname
