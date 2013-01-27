@@ -104,19 +104,18 @@ exports.WindowSlotGenerator = class WindowSlotGenerator extends SlotGenerator
 	@setDefault new this
 
 exports.Flippable = class Flippable
-	FLIP_TIME = 500
-	constructor: (@front, @back) ->
+	constructor: (@front, @back, @speed = 500) ->
 		@flipped = false
 		do @front?.show
 		do @back?.hide
 	
 	showBack: =>
-		@front?.hide 500
-		@back?.show 500
+		@front?.hide @speed
+		@back?.show @speed
 
 	showFront: =>
-		@front?.show 500
-		@back?.hide 500
+		@front?.show @speed
+		@back?.hide @speed
 
 	toggle: =>
 		if @flipped = not @flipped
