@@ -1,6 +1,8 @@
 iced = require './myiced'
 iced.util.pollute global
 
+UUID = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/
+
 module.exports = (app, model) ->
 	class Parser
 		constructor: ->
@@ -14,24 +16,23 @@ module.exports = (app, model) ->
 # before: (cb, args, req) ->
 # after: (cb, result) ->
 
-		registerMethod: (method, handler) ->
-			@methods.push handler
-			handler.method = method
-			
-		registerMethods: (tree) ->
-			for method, handler of tree
-				registerMethod method, handler
+		registerMethods: (list...) ->
+			@methods = @methods.concat list
 
 		findObject: func (autocb, req) ->
 			type = req.params.type
 			cls = model.getClassByType type
+			id = req.params.id
 			if type in ['inbox', 'urgent', 'maybe']
 				model[type]
-			else if cls? and (id = req.params.id)?
-				await model.cache.getInformation defer(info), id
-				info
-			else if cls? and req.method == "POST"
-				new cls
+			else if cls?
+				if UUID.test id
+					await model.cache.getInformation defer(info), id
+					info
+				else if req.method == "POST"
+					new cls
+				else
+					cls
 			else
 				null
 
@@ -86,41 +87,46 @@ module.exports = (app, model) ->
 
 	afterOnPost = (cb, ans) -> cb null, {id: ans}
 
-	parser.registerMethod model.Information::getType,
-		after: (cb, ans) -> cb null, {type: ans}
+	pgCode = (code) ->
+		(error) -> unless error.msg is 'pgerror' and error.pgerror.code is code then error else null
 
-	parser.registerMethod model.Information::setStatus,
+	parser.registerMethods {
+		method: model.Information::getType
+		after: func (autocb, ans) -> type: ans
+	},{
+		method: model.Information::setStatus
 		before: func (autocb, req) -> [req.body.status]
-
-	parser.registerMethod model.Information::addReference,
+	},{
+		method: model.Information::addReference
 		before: ref = func (autocb, req)	->
 			await model.cache.getInformation defer(reference), req.body.reference
 			[reference]
-		catcher: (error) -> unless error.msg is 'pgerror' and error.pgerror.code is '23505' then error else null
-
-	parser.registerMethod model.Information::removeReference,
+		catcher: pgCode '23505'
+	},{
+		method: model.Information::removeReference
 		before: ref
-
-	parser.registerMethod model.Information::setDelay,
+	},{
+		method: model.Information::setDelay,
 		before: (cb, req) -> cb null, [if req.body.delay isnt '' then new Date req.body.delay else null]
-
-	parser.registerMethod model.Note::create,
+	},{
+		method: model.Note::create
 		before: con = func (autocb, req) -> [req.body.content]
 		after: afterOnPost
-	
-	parser.registerMethod model.Note::setContent,
+	},{
+		method: model.Note::setContent
 		before: con
-		
-	parser.registerMethod model.inbox.getFirst,
+	},{
+		method: model.inbox.getFirst
 		after: (cb, ans) -> cb null, if ans? then {first: ans.id} else {msg: "inbox is empty"}
-
-	parser.registerMethod model.inbox.getSize,
+	},{
+		method: model.inbox.getSize
 		after: (cb, ans) -> cb null, {size: ans}
-		
-	parser.registerMethod model.inbox.get,
+	},{
+		method: model.inbox.get
 		after: (cb, ans) -> cb null, {size: ans.size, first: ans.first?.id}
-		
-	parser.registerMethod model.Information::get, {}
+	},{
+		method: model.Information::get
+	}
 
 	app.all "/json/:type/:id", parser.parse
 	app.all "/json/:type", parser.parse
