@@ -253,7 +253,7 @@ module.exports = (connectionString) ->
 				text: 'INSERT INTO note (id, content) VALUES ($1, $2);'
 				after: func (autocb) => @id
 
-		setContent: (cb, content, t) =>
+		setContent: (cb, content, t) ->
 			queryNone cb, t,
 				text: 'UPDATE note SET content=$2 WHERE id=$1'
 				values: [@id, content]
@@ -265,7 +265,7 @@ module.exports = (connectionString) ->
 			queryNone cb, t,
 				before: func (autocb, config, t) =>
 					await Information::create.call this, defer(), 'default', referencing, t
-					config.values = [@id, content]
+					config.values = [@id, description]
 				text: 'INSERT INTO task (id, description) VALUES ($1, $2);'
 				after: func (autocb) => @id
 
@@ -300,13 +300,17 @@ module.exports = (connectionString) ->
 				values: [@id]
 
 		uncollapse: (cb, t) ->
-			queryNone
+			queryNone cb, t,
 				text: 'UPDATE project SET collapsed=FALSE WHERE id=$1;'
 				values: [@id]
 
+		@getActive: (cb, t) ->
+			queryMany cb, t,
+				text: 'SELECT * FROM activeprojectview;'
+
 		@getAll: (cb, t) ->
 			queryMany cb, t,
-				text: 'SELECT * FROM projectview WHERE completed IS NULL;'
+				text: 'SELECT * FROM projectview;'
 
 
 	class Asap extends Task
@@ -314,7 +318,7 @@ module.exports = (connectionString) ->
 		create: (cb, description, list, referencing=null, project=null, t) ->
 			queryNone cb, t,
 				before: func (autocb, config, t) =>
-					await Task::create this, defer(), description, referencing, t
+					await Task::create.call this, defer(), description, referencing, t
 					config.values = [@id, list.id, if project? then project.id else null]
 				text: 'INSERT INTO asap (id, asaplist, project) VALUES ($1, $2, $3);'
 				after: func (autocb) => @id
@@ -330,14 +334,18 @@ module.exports = (connectionString) ->
 				text: 'UPDATE asap SET asaplist=$2 WHERE id=$1;'
 				values: [@id, list.id]
 
-		@getAllFromList: (cb, list, t) ->
+		@getActiveFromList: (cb, list, t) ->
 			queryMany cb, t,
-				text: 'SELECT * FROM asapview WHERE asaplist=$1 AND completed IS NULL;'
+				text: 'SELECT * FROM activeasapview WHERE asaplist=$1;'
 				values: [list.id]
 
 		@getAll: (cb, t) ->
 			queryMany cb, t,
-				text: 'SELECT * FROM asapview WHERE completed IS NULL;'
+				text: 'SELECT * FROM asapview;'
+
+		@getActive: (cb, t) ->
+			queryMany cb, t,
+				text: 'SELECT * FROM activeasapview;'
 
 	class AsapList extends Information
 
@@ -362,7 +370,7 @@ module.exports = (connectionString) ->
 
 		@getAll: (cb, t) =>
 			queryMany cb, t,
-				text: 'SELECT id, name FROM asaplist;'
+				text: 'SELECT * FROM asaplistview;'
 		###
 	class SocialEntity extends Information
 

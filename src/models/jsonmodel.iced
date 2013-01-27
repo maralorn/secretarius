@@ -137,25 +137,67 @@ class Note extends Information
 			content: content
 
 class Task extends Information
-	create: (description, referencing=null) ->
-	done: ->
-	undo: ->
+	done: (cb) ->
+		@_patch cb,
+			method: 'done'
+
+	undo: (cb) ->
+		@_patch cb,
+			method: 'undo'
 
 class Project extends Task
-	create: (description, referencing=null, parent=null) ->
+	create: (cb, description, referencing=null, parent=null) ->
+		@_create cb,
+			description: description
+			referencing: referencing?.id
+			parent: parent?.id
+
 	setParent: (parent) ->
-	collapse: ->
-	uncollapse: ->
-	@getAll: () ->
+		@_patch cb,
+			parent: parent?.id
+			method: 'setParent'
+
+	collapse: (cb) ->
+		@_patch cb,
+			method: 'collapse'
+
+	uncollapse: (cb) ->
+		@_patch cb,
+			method: 'uncollapse'
+
+	@getActive: (cb) =>
+		getInfos	cb, this, 'active'
+
+	@getAll: (cb) =>
+		getInfos	cb, this, 'all'
 
 class Asap extends Task
-	create: (description, list, referencing=null, project=null) ->
-	setProject: (project) ->
-	setList: (list) ->
-	@getAllFromList: (list) ->
-	@getAll: (cb) ->
-		new this()._get cb,
-			filter: 'all'
+	create: (cb, description, list, referencing=null, project=null) ->
+		@_create cb,
+			description: description
+			list: list.id
+			referencing: referencing?.id
+			project: project?.id
+
+	setProject: (cb, project) ->
+		@_patch cb,
+			project: project?.id
+			method: 'setProject'
+
+	setList: (cb, list) ->
+		@_patch cb,
+			list: list.id
+			method: 'setList'
+
+	@getAllFromList: (cb, list) =>
+		getInfos cb, this, 'allFromList',
+			list: list.id
+
+	@getAll: (cb) =>
+		getInfos cb, this, 'all'
+
+	@getActive: (cb) =>
+		getInfos cb, this, 'active'
 
 class AsapList extends Information
 	create: (cb, name) ->
@@ -167,9 +209,8 @@ class AsapList extends Information
 			method: "rename"
 			name: name
 
-	@getAll: (cb) ->
-		new this()._get cb,
-			filter: 'all'
+	@getAll: (cb) =>
+		getInfos cb, this, 'all'
 
 class SocialEntity extends Information
 	create: ->

@@ -327,11 +327,17 @@ CREATE VIEW asapview AS
 			LEFT OUTER JOIN task p ON a.project=p.id 
 			INNER JOIN asaplist l ON l.id = a.asaplist;
 
+CREATE VIEW activeasapview AS
+	SELECT * FROM asapview WHERE (delay IS NULL OR delay < CURRENT_TIMESTAMP) AND completed IS NULL;
+
 
 CREATE VIEW projectview AS
 	SELECT t.* , p.parent, p.collapsed
 		FROM taskview t 
 			INNER JOIN project p USING (id);
+
+CREATE VIEW activeprojectview AS
+	SELECT * FROM projectview WHERE (delay IS NULL OR delay < CURRENT_TIMESTAMP) AND completed IS NULL;
 
 CREATE VIEW asaplistview AS
 	SELECT i.*, name
