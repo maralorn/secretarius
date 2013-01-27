@@ -15,8 +15,6 @@ class ErrorHandler
 				catcher error
 				return
 			catch error
-		error.stack = [] unless error.stack?
-		error.stack.push errString()
 		@cb error
 
 exports.throw2cb = throw2cb = (func) ->
