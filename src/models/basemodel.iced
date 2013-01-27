@@ -5,7 +5,7 @@ iced.util.pollute if window? then window else global
 
 model.getClassByType = (type) ->
 		for name, class_ of this
-			return class_ if name.toLowerCase() == type
+			return class_ if name.toLowerCase() is type
 
 model.extend = (obj) ->
 	model[key] = value for key, value of obj

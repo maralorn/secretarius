@@ -9,7 +9,7 @@ module.exports = (app, model) ->
 		findGetter: (filter, object) ->
 			string = "get#{if filter? then filter else ''}".toLowerCase()
 			for name, getter of object
-				return getter if name.toLowerCase() == string
+				return getter if name.toLowerCase() is string
 
 # before: (cb, args, req) ->
 # after: (cb, result) ->

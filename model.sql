@@ -54,9 +54,9 @@ CREATE TABLE note(
 );
 
 CREATE TABLE task(
-	id          uuid PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
-	description varchar NOT NULL,
-	completed   timestamptz,
+	id           uuid PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
+	description  varchar NOT NULL,
+	completed    timestamptz,
 	deadline     timestamptz
 );
 
