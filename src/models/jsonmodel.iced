@@ -109,9 +109,6 @@ class Information extends PGObject
 	_url: -> "#{if @type? then @type else "information"}#{if @id? then "/#{@id}" else ""}"
 
 	_store: (values) ->
-		for key,value of values
-			switch key
-				when 'delay' then if value? then values[key] = new Date value
 		@values = values
 		(@[key] = value) for key,value of values
 		@change values

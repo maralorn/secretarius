@@ -43,7 +43,7 @@ exports.View = class View
 
 exports.DropArea = class Droparea
 	constructor: (contentNode, cb) ->
-		contentNode.bind 'dragover', (ev) -> if 'text/plain' in (ev = ev.originalEvent).dataTransfer.types then do ev.preventDefault
+		contentNode.bind 'dragover', (ev) -> do ev.originalEvent.preventDefault
 		contentNode.bind 'drop', (ev) ->
 			do ev.originalEvent.preventDefault
 			cb ev.originalEvent.dataTransfer.getData 'text/plain'
@@ -179,7 +179,7 @@ exports.TimePicker = class TimePicker
 		else
 			do @innerFlip.showFront
 			date = new Date
-		@display.attr 'x-time', 0.001 * do date.getTime
+		@display.attr 'x-time', date
 		for unit, fn of units
 			this[unit].val do date["get#{fn}"] + if unit is 'month' then 1 else 0
 

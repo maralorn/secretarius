@@ -4,7 +4,7 @@ iced.util.pollute global
 module.exports = (app, model) ->
 	class Parser
 		constructor: ->
-			@methods = {}
+			@methods = []
 
 		findGetter: (filter, object) ->
 			string = "get#{if filter? then filter else ''}".toLowerCase()
@@ -15,7 +15,8 @@ module.exports = (app, model) ->
 # after: (cb, result) ->
 
 		registerMethod: (method, handler) ->
-			@methods[method] = handler
+			@methods.push handler
+			handler.method = method
 			
 		registerMethods: (tree) ->
 			for method, handler of tree
@@ -61,7 +62,10 @@ module.exports = (app, model) ->
 			return do next if object is null
 			method = @findMethod req, object
 			return abort error if error?
-			handler = @methods[method]
+			handler = null
+			for handlerobj in @methods
+				if handlerobj.method is method
+					handler = handlerobj
 			return do next unless handler?
 			if handler.before?
 				await handler.before defer(error, args), req
@@ -82,29 +86,29 @@ module.exports = (app, model) ->
 
 	afterOnPost = (cb, ans) -> cb null, {id: ans}
 
-	parser.registerMethod model.Information.prototype.getType,
+	parser.registerMethod model.Information::getType,
 		after: (cb, ans) -> cb null, {type: ans}
 
-	parser.registerMethod model.Information.prototype.setStatus,
+	parser.registerMethod model.Information::setStatus,
 		before: func (autocb, req) -> [req.body.status]
 
-	parser.registerMethod model.Information.prototype.addReference,
+	parser.registerMethod model.Information::addReference,
 		before: ref = func (autocb, req)	->
 			await model.cache.getInformation defer(reference), req.body.reference
 			[reference]
 		catcher: (error) -> unless error.msg is 'pgerror' and error.pgerror.code is '23505' then error else null
 
-	parser.registerMethod model.Information.prototype.removeReference,
+	parser.registerMethod model.Information::removeReference,
 		before: ref
 
-	parser.registerMethod model.Information.prototype.setDelay,
+	parser.registerMethod model.Information::setDelay,
 		before: (cb, req) -> cb null, [if req.body.delay isnt '' then new Date req.body.delay else null]
 
-	parser.registerMethod model.Note.prototype.create,
+	parser.registerMethod model.Note::create,
 		before: con = func (autocb, req) -> [req.body.content]
 		after: afterOnPost
 	
-	parser.registerMethod model.Note.prototype.setContent,
+	parser.registerMethod model.Note::setContent,
 		before: con
 		
 	parser.registerMethod model.inbox.getFirst,
@@ -116,7 +120,7 @@ module.exports = (app, model) ->
 	parser.registerMethod model.inbox.get,
 		after: (cb, ans) -> cb null, {size: ans.size, first: ans.first?.id}
 		
-	parser.registerMethod model.Information.prototype.get, {}
+	parser.registerMethod model.Information::get, {}
 
 	app.all "/json/:type/:id", parser.parse
 	app.all "/json/:type", parser.parse

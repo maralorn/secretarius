@@ -64,7 +64,7 @@ exports.InfoView = class InfoView extends ui.View
 		$(".setStatus > button[name=#{@info.status}]", @context).addClass 'active'
 		$("span.created_at", @context).attr 'x-time', @info.created_at
 		$("span.last_edited", @context).attr 'x-time', @info.last_edited
-		@delayPicker.setDate @info.delay
+		@delayPicker.setDate if @info.delay? then new Date @info.delay else null
 		do @refContainer.empty
 		for referenceid in @info.references
 			await model.cache.getInformation catchNull(defer info), referenceid

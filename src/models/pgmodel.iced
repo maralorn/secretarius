@@ -29,19 +29,19 @@ module.exports = (connectionString) ->
 			await pg.connect connectionString, defer @client
 			do @begin
 
-		begin: ->
+		begin: =>
 			@client.query 'begin'
 
-		commit: ->
+		commit: =>
 			@client.query 'commit'
 
-		rollback: ->
+		rollback: =>
 			@client.query 'rollback'
 
 		query: func (autocb, config) ->
 			config.name = hash config.text
 			request = @client.query config
-			request.on 'error', (error) ->
+			request.on 'error', (error) =>
 				request.error =
 					msg: 'pgerror'
 					pgerror: error
@@ -53,7 +53,7 @@ module.exports = (connectionString) ->
 				callbackb = config.cb
 				delete config.cb
 			else
-				callback = (row, res) ->
+				callback = (row, res) =>
 					res.addRow(row)
 			await @query defer(request), config
 			request.on 'row', callback
@@ -70,17 +70,16 @@ module.exports = (connectionString) ->
 			await @queryMany defer(res), config
 			null
 
-	class PGObject extends model.ModelObject
 #	text
 #	values
 #	transaction
 #	after
 #	before
 #	expect
-		query: func (autocb, config) ->
+	query = func (autocb, config) ->
 			transaction = config.transaction
 			if transaction? then t = transaction else await t = new Transaction defer()
-			catchCB (err) ->
+			catchCB (err) =>
 				do t.rollback unless transaction?
 				throw err
 			if config.before?
@@ -94,23 +93,33 @@ module.exports = (connectionString) ->
 			t.commit() unless transaction?
 			res
 
-		queryNone: (cb, transaction, config) ->
+	queryNone = (cb, transaction, config) ->
 			config.transaction = transaction
 			config.func = 'queryNone'
-			@query cb, config
+			query cb, config
 
-		queryOne: (cb, transaction, config) ->
+	queryOne = (cb, transaction, config) ->
 			config.transaction = transaction
 			config.func = 'queryOne'
-			@query cb, config
+			query cb, config
 		
-		queryMany: (cb, transaction, config) ->
+	queryMany = (cb, transaction, config) ->
 			config.transaction = transaction
 			config.func = 'queryMany'
-			@query cb, config
+			query cb, config
 
+	timeOutID = null
+	do waitForDelay = ->
+		clearTimeout timeOutID
+		await queryOne defer(error, res), null,
+			text: 'SELECT delay FROM information WHERE delay > CURRENT_TIMESTAMP ORDER BY delay LIMIT 1;'
+		unless error?
+			timeOutID = setTimeout (->
+				queryNone (->), null,
+					text: 'NOTIFY inboxchange;'), new Date(res.delay).getTime() - new Date().getTime()
+	listen 'inboxchange', waitForDelay
 
-	class PGEntry extends PGObject
+	class PGObject extends model.ModelObject
 		constructor: (@id) ->
 
 
@@ -121,23 +130,23 @@ module.exports = (connectionString) ->
 			@type = tempType if tempType != 'information'
 			
 		create: (cb, status = 'default', referencing=null, t) ->
-			@queryOne cb, t,
+			queryOne cb, t,
 				text: 'INSERT INTO information (status) VALUES ($1) RETURNING id;'
 				values: [status],
-				after: func (autocb, res, transaction) ->
+				after: func (autocb, res, transaction) =>
 					@id = res.id
 					if referencing?
 						await @addReference defer(), referencing, transaction
 					@id
 
 		addReference: (cb, reference, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: 'INSERT INTO "references" (id, referenceid) VALUES ($1, $2);'
 				values: [@id, reference.id]
 
 
 		removeReference: (cb, reference, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: 'DELETE FROM "references" WHERE id=$1 AND referenceid=$2'
 				values: [@id, reference.id]
 
@@ -145,46 +154,46 @@ module.exports = (connectionString) ->
 			if @type?
 				cb @type
 			else
-				@queryOne catchNull(cb), t,
+				queryOne catchNull(cb), t,
 					text: 'SELECT type FROM type WHERE id=$1;'
 					values: [@id]
-					after: func (autocb, res) ->
+					after: func (autocb, res) =>
 						if res?
 							@type = res.type
 						else
 							throwError 'Couldnt get Type.', {id: @id}
 
 		get: (cb, t) ->
-			@queryOne cb, t,
-				before: func (autocb, config, t) ->
+			queryOne cb, t,
+				before: func (autocb, config, t) =>
 					await @getType defer(), t
 					config.text = "SELECT * FROM #{@type}view WHERE id=$1;"
 				values: [@id]
-				after: func (autocb, res, t) ->
+				after: func (autocb, res, t) =>
 					await @getReferences defer(references), t
 					res.references = references
 					await @getAttachments defer(attachments), t
 					res.attachments = attachments
-					(@[key] = value) for key,value of res
+					(this[key] = value) for key,value of res
 					res
 
 		setStatus: (cb, status, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: 'UPDATE information SET status=$2 WHERE id=$1;'
 				values: [@id, status]
 
 		setDelay: (cb, delay, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: "UPDATE information SET status='inbox', delay=$2 WHERE id=$1;"
 				values: [@id, if delay? then do delay.toISOString else null]
 
 		attach: (cb, file, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: 'INSERT INTO attachments (id, fileid) VALUES ($1, $2);'
 				values: [@id, file.id]
 
 		detach: (cb, file, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: 'DELETE FROM attachments WHERE id=$1 AND fileid=$2);'
 				values: [@id, file.id]
 
@@ -193,27 +202,27 @@ module.exports = (connectionString) ->
 			errors = {}
 			await for key, value of map
 				if not allowed? or key in allowed
-					@queryNone defer(), t,
+					queryNone defer(), t,
 						text: "UPDATE #{table} SET $2=$3 WHERE id=$1;"
 						values: [@id, key, value],
 			null
 
 		getReferences: (cb, t) ->
-			@queryMany cb, t,
+			queryMany cb, t,
 				text: 'SELECT referenceid FROM "references" WHERE id=$1;'
 				values: [@id]
-				after: func (autocb, res) -> (row.referenceid for row in res)
+				after: func (autocb, res) => (row.referenceid for row in res)
 
 		getAttachments: (cb, t) ->
-			@queryMany cb, t,
+			queryMany cb, t,
 				text: 'SELECT fileid FROM attachments WHERE id=$1;'
 				values: [@id]
-				after: func (autocb, res) -> (row.fileid for row in res)
+				after: func (autocb, res) => (row.fileid for row in res)
 
 		_store: (values) ->
 			@change values
 
-
+		###
 	class File extends PGObject
 
 		create: (cb, name, t) ->
@@ -233,19 +242,19 @@ module.exports = (connectionString) ->
 				text: 'DELETE FROM file WHERE id=$1'
 				values: [@id]
 
-
+###
 	class Note extends Information
 
 		create: (cb, content, t) ->
-			@queryNone cb, t,
-				before: func (autocb, config, t) ->
-					await Note.__super__.create.call this, defer(), 'inbox', null, t
+			queryNone cb, t,
+				before: func (autocb, config, t) =>
+					await Information::create.call this, defer(), 'inbox', null, t
 					config.values = [@id, content]
 				text: 'INSERT INTO note (id, content) VALUES ($1, $2);'
-				after: func (autocb) -> @id
+				after: func (autocb) => @id
 
-		setContent: (cb, content, t) ->
-			@queryNone cb, t,
+		setContent: (cb, content, t) =>
+			queryNone cb, t,
 				text: 'UPDATE note SET content=$2 WHERE id=$1'
 				values: [@id, content]
 
@@ -253,111 +262,113 @@ module.exports = (connectionString) ->
 	class Task extends Information
 
 		create: (cb, description, referencing=null, t) ->
-			@queryNone cb, t,
-				before: func (autocb, config, t) ->
-					await Task.__super.create.call this, defer(), 'default', referencing, t
+			queryNone cb, t,
+				before: func (autocb, config, t) =>
+					await Information::create.call this, defer(), 'default', referencing, t
 					config.values = [@id, content]
 				text: 'INSERT INTO task (id, description) VALUES ($1, $2);'
-				after: func (autocb) -> @id
+				after: func (autocb) => @id
 
-		done: (cb, t) ->
-			@queryNone cb, t,
+		done: (cb, t) =>
+			queryNone cb, t,
 				text: 'UPDATE task SET completed=CURRENT_TIMESTAMP WHERE id=$1'
 				values: [@id]
 
-		undo: (cb, t) ->
-			@queryNone cb, t,
+		undo: (cb, t) =>
+			queryNone cb, t,
 				text: 'UPDATE task SET completed=NULL WHERE id=$1'
 				values: [@id]
 
 	class Project extends Task
 
 		create: (cb, description, referencing=null, parent=null, t) ->
-			@queryNone cb, t,
-				before: func (autocb, config, t) ->
-					await super defer(), description, referencing, t
+			queryNone cb, t,
+				before: func (autocb, config, t) =>
+					await Task::create.call this, defer(), description, referencing, t
 					config.values = [@id, if parent? then parent.id else null]
 				text: 'INSERT INTO project (id, parent) VALUES ($1, $2);'
-				after: func (autocb) -> @id
+				after: func (autocb) => @id
 
 		setParent: (cb, parent, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: 'UPDATE project SET parent=$2 WHERE id=$1;'
 				values: [@id, if parent? then parent.id else null]
 
 		collapse: (cb, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: 'UPDATE project SET collapsed=TRUE WHERE id=$1;'
 				values: [@id]
 
 		uncollapse: (cb, t) ->
-			@queryNone
+			queryNone
 				text: 'UPDATE project SET collapsed=FALSE WHERE id=$1;'
 				values: [@id]
 
 		@getAll: (cb, t) ->
-			@queryMany cb, t,
+			queryMany cb, t,
 				text: 'SELECT * FROM projectview WHERE completed IS NULL;'
 
 
 	class Asap extends Task
 
 		create: (cb, description, list, referencing=null, project=null, t) ->
-			@queryNone cb, t,
-				before: func (autocb, config, t) ->
-					super defer(), description, referencing, t
+			queryNone cb, t,
+				before: func (autocb, config, t) =>
+					await Task::create this, defer(), description, referencing, t
 					config.values = [@id, list.id, if project? then project.id else null]
 				text: 'INSERT INTO asap (id, asaplist, project) VALUES ($1, $2, $3);'
-				after: func (autocb) -> @id
+				after: func (autocb) => @id
 
 		setProject: (cb, project, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: 'UPDATE asap SET project=$2 WHERE id=$1;'
 				values: [@id, project.id]
 
 
 		setList: (cb, list, t) ->
-			@queryNone cb, t,
+			queryNone cb, t,
 				text: 'UPDATE asap SET asaplist=$2 WHERE id=$1;'
 				values: [@id, list.id]
 
 		@getAllFromList: (cb, list, t) ->
-			@queryMany cb, t,
+			queryMany cb, t,
 				text: 'SELECT * FROM asapview WHERE asaplist=$1 AND completed IS NULL;'
 				values: [list.id]
 
 		@getAll: (cb, t) ->
-			@queryMany cb, t,
+			queryMany cb, t,
 				text: 'SELECT * FROM asapview WHERE completed IS NULL;'
 
-	class AsapList extends PGEntry
+	class AsapList extends Information
 
-		create: (cb, name, t) ->
-			@queryOne cb, t,
-				text: 'INSERT INTO asaplist (name) VALUES ($1) RETURNING id;'
-				values: [name]
-				after: func (autocb, res) -> @id = res.id
+		create: (cb, name, t) =>
+			queryNone cb, t,
+				before: func (autocb, config, t) =>
+					await Information::create.call this, defer(), 'default', referencing, t
+					config.values = [@id, name]
+				text: 'INSERT INTO task (id, description) VALUES ($1, $2);'
+				after: func (autocb) => @id
 
-		rename: (cb, name, t) ->
-			@queryNone cb, t,
+		rename: (cb, name, t) =>
+			queryNone cb, t,
 				text: 'UPDATE asaplist SET name=$2 WHERE id=$1;'
 				values: [@id, name]
 
-		delete: (cb, t) ->
-			@queryNone cb, t,
+		delete: (cb, t) =>
+			queryNone cb, t,
 				text: 'DELETE FROM asaplist WHERE id=$1;'
 				values: [@id]
 
 		@getByName: (cb, name, t) =>
-			@queryOne cb, t,
+			queryOne cb, t,
 				text: 'SELECT id FROM asaplist WHERE name=$1;'
 				values: [name]
 				after: func (autocb, res) -> new this res.id
 
 		@getAll: (cb, t) ->
-			@queryMany cb, t,
+			queryMany cb, t,
 				text: 'SELECT id, name FROM asaplist;'
-
+		###
 	class SocialEntity extends Information
 
 		create: (cb) ->
@@ -506,41 +517,40 @@ module.exports = (connectionString) ->
 			queryMany
 				text: 'SELECT * FROM maybe ORDER BY last_edited;'
 				values: []
-	
+###
 	class Inbox extends PGObject
 		
-		getSize: (cb, t) ->
-			@queryOne cb, t,
+		getSize: (cb, t) =>
+			queryOne cb, t,
 				text: 'SELECT count(*) FROM inbox;'
-				after: func (autocb, res) -> res.count
+				after: func (autocb, res) => res.count
 
-		getFirst: (cb, t) ->
-			@queryMany cb, t,
+		getFirst: (cb, t) =>
+			queryMany cb, t,
 				text: 'SELECT id FROM inbox ORDER BY created_at LIMIT 1;'
-				after: func (autocb, res) -> if res[0]?.id? then new Information(res[0].id) else null
+				after: func (autocb, res) => if res[0]?.id? then new Information(res[0].id) else null
 
-		get: (cb, t) ->
+		get: func (autocb, t) ->
 			answer = {}
 			await
-				@getSize defer(error1, answer.size), t
-				@getFirst defer(error2, answer.first), t
-			if error1? then cb? error1; return
-			if error2? then cb? error2; return
-			cb? null, answer
-
+				@getSize defer(answer.size), t
+				@getFirst defer(answer.first), t
+			answer
+	###
 	
 	class Urgent extends PGObject
 
 		getSize: ->
 		getList: ->
-
+###
 	model.extend
-		File: File
 		Note: Note
 		Asap: Asap
 		Information: Information
 		Project: Project
 		AsapList: AsapList
+		###	
+		File: File
 		Circle:Circle
 		Contact:Contact
 		Place:Place
@@ -552,7 +562,8 @@ module.exports = (connectionString) ->
 		Message:Message
 		Presence:Presence
 		Resource:Resource
-		inbox:new Inbox
 		maybe:new Maybe
 		urgent:new Urgent
+###
+		inbox:new Inbox
 		listen: listen

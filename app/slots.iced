@@ -20,7 +20,7 @@ exports.WindowSlot = class WindowSlot extends ui.Slot
 			do runclock
 			$('span.reltime').each ->
 				node = $(this)
-				node.html new Date(1000 * node.attr 'x-time').toRelativeTime
+				node.html new Date(node.attr 'x-time').toRelativeTime
 					nowThreshold: 3000
 			try
 				do $clock.show
