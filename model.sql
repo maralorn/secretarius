@@ -56,7 +56,8 @@ CREATE TABLE note(
 CREATE TABLE task(
 	id          uuid PRIMARY KEY REFERENCES information(id) ON DELETE CASCADE,
 	description varchar NOT NULL,
-	completed   timestamptz
+	completed   timestamptz,
+	deadline     timestamptz
 );
 
 CREATE TABLE project(
@@ -315,9 +316,9 @@ CREATE VIEW "maybe" AS
 		FROM infoview WHERE status = 'maybe';
 
 CREATE VIEW taskview AS
-	SELECT i.*, t.description, t.completed
+	SELECT i.*, description, completed, deadline
 		FROM infoview i
-			INNER JOIN task t USING (id); 
+			INNER JOIN task USING (id); 
 
 CREATE VIEW asapview AS
 	SELECT t.*, l.name AS asaplist, a.project, p.description AS projectdescription

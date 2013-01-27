@@ -109,15 +109,15 @@ module.exports = (connectionString) ->
 			query cb, config
 
 	timeOutID = null
-	do waitForDelay = ->
+	do triggerInboxchangeOnDelay = ->
 		clearTimeout timeOutID
-		await queryOne defer(error, res), null,
+		await queryMany defer(error, res), null,
 			text: 'SELECT delay FROM information WHERE delay > CURRENT_TIMESTAMP ORDER BY delay LIMIT 1;'
-		unless error?
+		if res.length > 0
 			timeOutID = setTimeout (->
 				queryNone (->), null,
-					text: 'NOTIFY inboxchange;'), new Date(res.delay).getTime() - new Date().getTime()
-	listen 'inboxchange', waitForDelay
+					text: 'NOTIFY inboxchange;'), new Date(res[0].delay).getTime() - new Date().getTime()
+	listen 'inboxchange', triggerInboxchangeOnDelay
 
 	class PGObject extends model.ModelObject
 		constructor: (@id) ->
