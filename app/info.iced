@@ -38,6 +38,7 @@ exports.InfoView = class InfoView extends ui.View
 					console.log error
 		do @initContent
 		do @draw
+		new ui.Flippable(null, $('.options', @context)).addToggler $('button[name=options]', @context)
 
 	delete: =>
 		@info.removeCb 'changed', @draw

@@ -107,16 +107,16 @@ exports.Flippable = class Flippable
 	FLIP_TIME = 500
 	constructor: (@front, @back) ->
 		@flipped = false
-		do @front.show
-		do @back.hide
+		do @front?.show
+		do @back?.hide
 	
 	showBack: =>
-		@front.hide 500
-		@back.show 500
+		@front?.hide 500
+		@back?.show 500
 
 	showFront: =>
-		@front.show 500
-		@back.hide 500
+		@front?.show 500
+		@back?.hide 500
 
 	toggle: =>
 		if @flipped = not @flipped
