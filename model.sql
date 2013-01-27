@@ -373,7 +373,7 @@ CREATE FUNCTION delete() RETURNS trigger AS $$
 $$ LANGUAGE plpythonu;
 
 CREATE TRIGGER delete AFTER UPDATE ON information FOR EACH ROW WHEN (NEW.status = 'delete') EXECUTE PROCEDURE delete();
-CREATE TRIGGER infochange AFTER UPDATE ON information FOR EACH ROW WHEN (OLD.last_edited = NEW.last_edited AND NEW.status != 'delete') EXECUTE PROCEDURE set_timestamp();
+CREATE TRIGGER infochange AFTER UPDATE ON information FOR EACH ROW WHEN ((NEW.last_edited IS NULL) OR ((CURRENT_TIMESTAMP - NEW.last_edited > INTERVAL '1') AND NEW.status != 'delete')) EXECUTE PROCEDURE set_timestamp();
 CREATE TRIGGER notechange AFTER UPDATE ON note FOR EACH ROW EXECUTE PROCEDURE set_timestamp();
 CREATE TRIGGER taskchange AFTER UPDATE ON task FOR EACH ROW EXECUTE PROCEDURE set_timestamp();
 CREATE TRIGGER asapchange AFTER UPDATE ON asap FOR EACH ROW EXECUTE PROCEDURE set_timestamp();
