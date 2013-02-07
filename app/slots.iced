@@ -21,7 +21,7 @@ exports.WindowSlot = class WindowSlot extends ui.Slot
 			$('span.reltime').each ->
 				node = $(this)
 				node.html new Date(node.attr 'x-time').toRelativeTime
-					nowThreshold: 3000
+					nowThreshold: 1000
 			try
 				do $clock.show
 				$clock.html "#{new Date.toLocaleString()} Inbox:#{model.inbox.values.size}"
