@@ -165,15 +165,10 @@ module.exports = (connectionString) ->
 
 		get: (cb, t) ->
 			queryOne cb, t,
-				before: func (autocb, config, t) =>
-					await @getType defer(), t
-					config.text = "SELECT * FROM #{@type}view WHERE id=$1;"
+				text: "SELECT getInformation($1) as info;"
 				values: [@id]
 				after: func (autocb, res, t) =>
-					await @getReferences defer(references), t
-					res.references = references
-					await @getAttachments defer(attachments), t
-					res.attachments = attachments
+					res = JSON.parse res.info
 					(this[key] = value) for key,value of res
 					res
 
@@ -261,12 +256,12 @@ module.exports = (connectionString) ->
 
 	class Task extends Information
 
-		create: (cb, description, referencing=null, t) ->
+		create: (cb, description, referencing=null, parent=null, t) ->
 			queryNone cb, t,
 				before: func (autocb, config, t) =>
 					await Information::create.call this, defer(), 'default', referencing, t
-					config.values = [@id, description]
-				text: 'INSERT INTO task (id, description) VALUES ($1, $2);'
+					config.values = [@id, description, if parent? then parent.id else null]
+				text: 'INSERT INTO task (id, description, parent) VALUES ($1, $2, $3);'
 				after: func (autocb) => @id
 
 		done: (cb, t) =>
@@ -279,20 +274,21 @@ module.exports = (connectionString) ->
 				text: 'UPDATE task SET completed=NULL WHERE id=$1'
 				values: [@id]
 
+		setParent: (cb, parent, t) ->
+			queryNone cb, t,
+				text: 'UPDATE task SET parent=$2 WHERE id=$1;'
+				values: [@id, if parent? then parent.id else null]
+
+
 	class Project extends Task
 
 		create: (cb, description, referencing=null, parent=null, t) ->
 			queryNone cb, t,
 				before: func (autocb, config, t) =>
-					await Task::create.call this, defer(), description, referencing, t
-					config.values = [@id, if parent? then parent.id else null]
-				text: 'INSERT INTO project (id, parent) VALUES ($1, $2);'
+					await Task::create.call this, defer(), description, referencing, parent, t
+					config.values = [@id]
+				text: 'INSERT INTO project (id) VALUES ($1);'
 				after: func (autocb) => @id
-
-		setParent: (cb, parent, t) ->
-			queryNone cb, t,
-				text: 'UPDATE project SET parent=$2 WHERE id=$1;'
-				values: [@id, if parent? then parent.id else null]
 
 		collapse: (cb, t) ->
 			queryNone cb, t,
@@ -318,16 +314,10 @@ module.exports = (connectionString) ->
 		create: (cb, description, list, referencing=null, project=null, t) ->
 			queryNone cb, t,
 				before: func (autocb, config, t) =>
-					await Task::create.call this, defer(), description, referencing, t
-					config.values = [@id, list.id, if project? then project.id else null]
-				text: 'INSERT INTO asap (id, asaplist, project) VALUES ($1, $2, $3);'
+					await Task::create.call this, defer(), description, referencing, project, t
+					config.values = [@id, list.id]
+				text: 'INSERT INTO asap (id, asaplist) VALUES ($1, $2);'
 				after: func (autocb) => @id
-
-		setProject: (cb, project, t) ->
-			queryNone cb, t,
-				text: 'UPDATE asap SET project=$2 WHERE id=$1;'
-				values: [@id, project.id]
-
 
 		setList: (cb, list, t) ->
 			queryNone cb, t,
@@ -530,7 +520,7 @@ module.exports = (connectionString) ->
 
 		getFirst: (cb, t) =>
 			queryMany cb, t,
-				text: 'SELECT id FROM inbox ORDER BY created_at LIMIT 1;'
+				text: 'SELECT id FROM inbox ORDER BY "createdAt" LIMIT 1;'
 				after: func (autocb, res) => if res[0]?.id? then new Information(res[0].id) else null
 
 		get: func (autocb, t) ->
