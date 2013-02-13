@@ -48,7 +48,7 @@ module.exports = (connectionString) ->
 					query: config
 			request
 	
-		queryMany: func (autocb, config) ->
+		queryMany: func (cb, config) ->
 			if config.cb?
 				callbackb = config.cb
 				delete config.cb
@@ -58,8 +58,8 @@ module.exports = (connectionString) ->
 			await @query defer(request), config
 			request.on 'row', callback
 			await request.on 'end', addNull(defer res)
-			throw request.error if request.error?
-			res.rows
+			return throwError request.error if request.error?
+			cb res.rows
 		
 		queryOne: func (autocb, config) ->
 			await @queryMany defer(res), config
@@ -79,9 +79,9 @@ module.exports = (connectionString) ->
 	query = func (autocb, config) ->
 			transaction = config.transaction
 			if transaction? then t = transaction else await t = new Transaction defer()
-			catchCB (err) =>
+			catchCB (cb, err) =>
 				do t.rollback unless transaction?
-				throw err
+				cb err
 			if config.before?
 				await config.before.call this, defer(), config, t
 			await t[config.func] defer(res),

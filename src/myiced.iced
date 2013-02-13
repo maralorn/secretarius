@@ -11,10 +11,7 @@ class ErrorHandler
 		@catchers.push catcher
 	handle: (error) ->
 		for catcher in @catchers
-			try
-				catcher error
-				return
-			catch error
+			await catcher defer(error), error
 		@cb error
 
 exports.throw2cb = throw2cb = (func) ->
@@ -23,10 +20,7 @@ exports.throw2cb = throw2cb = (func) ->
 		@.__errorHandler = handler = new ErrorHandler args[0]
 		args[0] = (args...) -> handler.cb.apply null, [null].concat args
 		args[0].__errorHandler = handler
-		try
-			func.apply this, args
-		catch error
-			handler.handle error
+		func.apply this, args
 		@.__errorHandler = saveHandler
 
 continuationCatcher = (errorHandler, continuation) ->
@@ -34,10 +28,7 @@ continuationCatcher = (errorHandler, continuation) ->
 		args[0] = {} unless args[0]?
 		saveHandler = @.__errorHandler
 		@.__errorHandler = args[0].__errorHandler = errorHandler
-		try
-			continuation.apply this, args
-		catch error
-			errorHandler.handle error
+		continuation.apply this, args
 		@.__errorHandler = saveHandler
 
 exports.cb2throw = cb2throw = (cb, args...) ->
@@ -58,6 +49,12 @@ addNull = (cb) ->
 
 exports.addCatcher = addCatcher = (catcher) ->
 	@.__errorHandler?.addCatcher catcher
+
+exports.util = {}
+
+exports.util.throwError = throwError = (error) ->
+	@.__errorHandler.handle error
+
 
 __fd = iced.findDeferral
 
@@ -94,7 +91,6 @@ iced.Deferrals = class Deferrals extends iced.Deferrals
 	
 iced.catchExceptions?()
 
-exports.util = {}
 
 exports.util.singlify = singlify = (func) ->
 	calls = []
@@ -117,9 +113,6 @@ exports.util.arrayEqual = arrayEqual = (a, b) ->
 	for element, index in a
 		return false if element isnt b[index]
 	true
-
-exports.util.throwError = throwError = (msg, data) ->
-	throw new Error "#{msg} #{if data? then JSON.stringify data else ''}"
 
 debugOn = false
 exports.util.enableDebugMode = () -> debugOn = true
