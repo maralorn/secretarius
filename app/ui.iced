@@ -195,6 +195,161 @@ exports.TimePicker = class TimePicker
 	getDate: =>
 		@date
 
+exports.ListManager = class ListManager
+	constructor: (@node, @creator) ->
+		@elements = {}
+		
+	setList: (list) ->
+		for id in list when id not of @elements
+			await @creator defer(element), id
+			unless id of @elements
+				@elements[id] = element
+				if (id is @select)
+					element.prop 'selected', true
+				element.appendTo @node
+		for id, element of @elements when id not in list
+			delete @elements[id]
+			do element.remove
+
+exports.InfoListManager = class InfoListManager extends ListManager
+	constructor: (node, creator) ->
+		super node, (cb, id) ->
+			await model.cache.getInformation defer(error, info), id
+			unless error? or not info?
+				creator cb, info
+
+exports.createInfoButton = createInfoButton = (info, type=false, del) ->
+	domnode = $(require('template/infobutton') del: del?)
+	labelnode = $('.label', domnode)
+	if del? then $('button', domnode).click (ev) ->
+		do ev.preventDefault
+		do ev.stopPropagation
+		del info
+	info.onChanged setLabel = (info) ->
+		await exports.info2label catchNull(defer label), info
+		label = (label.split ':')[1..].join ':' unless type
+		labelnode.html label
+	setLabel info
+	emitter = new Emitter domnode
+	emitter.setViewName exports.info2viewname info
+	domnode
+
+exports.InfoList = class InfoList extends InfoListManager
+	constructor: (node, type=false, del) ->
+		super node, (autocb, reference) ->
+			createInfoButton reference, type, del
+
+exports.ReferenceList = class ReferenceList extends InfoList
+	constructor: (node, info) ->
+		new DropArea node, (viewname) ->
+			if (id = /^\w*:(.*)$/.exec(viewname)?[1])?
+				await model.cache.getInformation defer(error, reference), id
+				unless error? or not reference?
+					await info.addReference defer(error), reference
+		super node, true, (reference) -> info.removeReference (->), reference
+
+exports.InfoClassListManager = class InfoClassListManager extends InfoListManager
+	constructor: (node, cls, creator) ->
+		super node, creator
+		cls.onChanged @setList
+	#	await cls.getAll defer(error)
+		await cls.getAllIDs defer(error, ids)
+		@setList ids
+		
+exports.AsapListsList = class AsapListsList extends InfoClassListManager
+	constructor: (node) ->
+		super node, model.AsapList, (autocb, list) ->
+			listnode = $("<button>#{list.name}</button>")
+			list.onChanged (list) -> listnode.html list.name
+			new Emitter(listnode).setViewName "asaplist:#{list.id}"
+			listnode
+
+
+exports.InfoClassPicker = class InfoClassPicker extends InfoClassListManager
+	
+	constructor: (node, cls, defaultoption, cb) ->
+		@select = null
+		@picker = $('<select />')
+		node.append @picker
+		if defaultoption?
+			@picker.append $(new Option defaultoption, '')
+		super @picker, cls, cb
+	
+	sel: (id) ->
+		@select = id
+		if id of @elements
+			@elements[id].prop 'selected', true
+
+	getInfo: (cb) ->
+		model.cache.getInformation cb, @picker.val()
+		
+	onChanged: (cb) ->
+		@picker.change =>
+			await @getInfo defer error, info
+			cb info
+
+exports.ProjectPicker = class ProjectPicker extends InfoClassPicker
+	constructor: (node) ->
+		super node, model.Project, 'No Project', (autocb, project) ->
+			projectnode = $(new Option project.description, project.id)
+			project.onChanged (project) -> projectnode.html project.description
+			projectnode
+
+exports.ListPicker = class ListPicker extends InfoClassPicker
+	constructor: (node) ->
+		super node, model.AsapList, null, (autocb, list) ->
+			listnode = $(new Option list.name, list.id)
+			list.onChanged (list) -> listnode.html list.name
+			listnode
+
+exports.AsapListCreator = class AsapListCreator
+	constructor: (node) ->
+		node.html require('template/asaplistcreator')()
+		list = $('input[name=list]', node)
+		$('form[name=list]').submit (ev) ->
+			do ev.preventDefault
+			new model.AsapList().create ((error) -> list.val '' unless error?), list.val()
+	
+
+exports.NoteCreator = class NoteCreator
+	constructor: (node) ->
+		node.html require('template/notecreator')()
+		content = $('input[name=note]', node)
+		$('form[name=note]', node).submit (ev) ->
+			do ev.preventDefault
+			new model.Note().create ((error) -> content.val '' unless error?), content.val()
+
+exports.AsapCreator = class AsapCreator
+	constructor: (node, @list=null, @project=null, @reference=null) ->
+		node.append form = $(require('template/asapcreator')
+			list: !(@list?)
+			project: !(@project?))
+		desc = $('input[name=asap]')
+		projectPicker = new ProjectPicker $('.projectsel', node)
+		listPicker = new ListPicker $('.listsel', node)
+		form.submit (ev) =>
+			do ev.preventDefault
+			await
+				projectPicker.getInfo defer error, @project unless @project?
+				listPicker.getInfo defer error, @list unless @list?
+			new model.Asap().create (-> desc.val ''), desc.val(), @list, @reference, @project
+		
+	setList: (@list) ->
+	setProject: (@project) ->
+	setReference: (@reference) ->
+		
+exports.ProjectCreator = class ProjectCreator
+	constructor: (@node, @parent=null, @reference=null) ->
+		node.append form = $(require('template/projectcreator')
+			parend: !(@parent?))
+		desc = $('input[name=project]')
+		parentPicker = new ProjectPicker $('.parentpicker', node)
+		form.submit (ev) =>
+			do ev.preventDefault
+			await parentPicker.getInfo defer error, @parent unless @parent?
+			new model.Project().create (-> desc.val ''), desc.val(), @reference, @parent
+	setParent: (@parent) ->
+	setReference: (@reference) ->
 		
 exports.defaultTo = defaultTo = (obj, defaults) ->
 	for key, value of defaults

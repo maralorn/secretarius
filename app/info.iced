@@ -28,14 +28,7 @@ exports.InfoView = class InfoView extends ui.View
 			do ev.preventDefault
 			@clean true
 		new ui.Uploader $('.upload', @context)
-		@refContainer = $('.referenceContainer', @context)
-		new ui.DropArea $('.references', @context), (viewname) ->
-			if (id = /^\w*:(.*)$/.exec(viewname)?[1])?
-				await model.cache.getInformation defer(error, reference), id
-				unless error?
-					await info.addReference defer(error), reference
-				if error?
-					console.log error
+		@refManager = new ui.ReferenceList $('.references', @context), @info
 		do @initContent
 		do @draw
 		new ui.Flippable($('.options', @context), null).addToggler $('button[name=options]', @context)
@@ -66,22 +59,7 @@ exports.InfoView = class InfoView extends ui.View
 		$("span.created_at", @context).attr 'x-time', @info.createdAt
 		$("span.last_edited", @context).attr 'x-time', @info.lastEdited
 		@delayPicker.setDate if @info.delay? then new Date @info.delay else null
-		do @refContainer.empty
-		for referenceid in @info.references
-			await model.cache.getInformation catchNull(defer info), referenceid
-			domnode = $('<span />')
-			domnode.appendTo @refContainer
-			info.onChanged setLabel = (values) =>
-				await ui.id2label catchNull(defer label), values.id
-				domnode.html "#{label}<button>x</button>"
-				$('button', domnode).click values, (ev) =>
-					do ev.preventDefault
-					do ev.stopPropagation
-					@info.removeReference (->), ev.data
-			setLabel info
-			info.onDeleted -> do domnode.remove
-			emitter = new ui.Emitter domnode
-			emitter.setViewName ui.info2viewname info
+		@refManager.setList @info.references
 		
 class NoteView extends InfoView
 	@registerView /^note:(.*)$/, this, func (autocb, match) ->
@@ -112,6 +90,16 @@ class NoteView extends InfoView
 				msg.html 'Save failed!'
 			else
 				msg.html 'Saved!'
+
+class ProjectView extends InfoView
+	@registerView /^project:(.*)$/, this, func (autocb, match) ->
+		await model.cache.getInformation defer(project), match[1]
+		"Project: #{project.description}"
+
+class AsapView extends InfoView
+	@registerView /^asap:(.*)$/, this, func (autocb, match) ->
+		await model.cache.getInformation defer(asap), match[1]
+		"ToDo: #{asap.description}"
 
 class AsapListView extends InfoView
 	@registerView /^asaplist:(.*)$/, this, func (autocb, match) ->

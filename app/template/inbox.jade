@@ -1,19 +1,9 @@
 h1
 .inboxinfo
-.newtasks
+.front
 	button(name='asap') New ToDo
 	button(name='project') New Project
-	form(name='newtodo')
-		input(name='asap')
-		| List:
-		select(name='list')
-		| Project:
-		select(name='project')
-		button(type='button') Cancel
-		button Create ToDo
-	form(name='newproject')
-		input(name='project')
-		| Parent:
-		select(name='parent')
-		button(type='button') Cancel
-		button Create Project
+.back
+	button Cancel
+	.newproject
+	.newasap
