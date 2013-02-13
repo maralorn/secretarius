@@ -80,7 +80,9 @@ class NoteView extends InfoView
 		@area.autosize
 			append: '\n'
 		@area.keyup @dirty
-		@area.change @dirty
+		@area.change =>
+			do @dirty
+			@clean true
 
 	save: ->
 		unless @info.content is do @area.val
