@@ -2,11 +2,8 @@
 ports = []
 
 self.addEventListener 'connect',((e) ->
-	ports.push (port = e.ports[0])
-	do port.start
-	port.postMessage
-		data: ['test']
-		msg: 'Hello!'), false
+	ports.push port = e.ports[0]
+	do port.start)
 
 broadcast = (name) ->
 	(event) ->

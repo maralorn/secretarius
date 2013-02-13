@@ -79,7 +79,7 @@ module.exports = (app, model) ->
 			if handler.after?
 				await handler.after defer(error, result), result
 				return abort error if error?
-			respond 200, result or {msg: "success"}
+			respond 200, if result? then result else {msg: "success"}
 			
 	parser = new Parser
 
@@ -121,7 +121,7 @@ module.exports = (app, model) ->
 			after: (cb, ans) -> cb null, if ans? then {first: ans.id} else {msg: "inbox is empty"}
 			method: model.inbox.getFirst,
 
-		after: (cb, ans) -> cb null, {size: ans}
+		after: func (autocb, ans) -> size: ans
 		method: model.inbox.getSize,
 
 			after: (cb, ans) -> cb null, {size: ans.size, first: ans.first?.id}
@@ -177,12 +177,11 @@ module.exports = (app, model) ->
 
 
 		before: name = func (autocb, req) ->
-			debug req.body.name
 			[req.body.name]
 		method: model.AsapList::create,
 
 			before: name
 			method: model.AsapList::rename
-	
+
 	app.all "/json/:type/:id", parser.parse
 	app.all "/json/:type", parser.parse
