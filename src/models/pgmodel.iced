@@ -217,6 +217,16 @@ module.exports = (connectionString) ->
 		_store: (values) ->
 			@change values
 
+		@getAllIDs: (cb, t) ->
+			queryOne cb, t,
+				text: "select array_to_json(array_agg(id)) as list from #{@.name.toLowerCase()};"
+				after: func (autocb, res) => if res.list? then JSON.parse res.list else []
+
+
+		@getAll: (cb, t) ->
+			queryOne cb, t,
+				text: "SELECT array_to_json(array_agg(getInformation(id))) as list FROM #{@.name.toLowerCase()};"
+				after: func (autocb, res) -> if res.list? then JSON.parse res.list else []
 		###
 	class File extends PGObject
 
@@ -300,15 +310,6 @@ module.exports = (connectionString) ->
 				text: 'UPDATE project SET collapsed=FALSE WHERE id=$1;'
 				values: [@id]
 
-		@getActive: (cb, t) ->
-			queryMany cb, t,
-				text: 'SELECT * FROM activeprojectview;'
-
-		@getAll: (cb, t) ->
-			queryMany cb, t,
-				text: 'SELECT * FROM projectview;'
-
-
 	class Asap extends Task
 
 		create: (cb, description, list, referencing=null, project=null, t) ->
@@ -323,19 +324,6 @@ module.exports = (connectionString) ->
 			queryNone cb, t,
 				text: 'UPDATE asap SET asaplist=$2 WHERE id=$1;'
 				values: [@id, list.id]
-
-		@getActiveFromList: (cb, list, t) ->
-			queryMany cb, t,
-				text: 'SELECT * FROM activeasapview WHERE asaplist=$1;'
-				values: [list.id]
-
-		@getAll: (cb, t) ->
-			queryMany cb, t,
-				text: 'SELECT * FROM asapview;'
-
-		@getActive: (cb, t) ->
-			queryMany cb, t,
-				text: 'SELECT * FROM activeasapview;'
 
 	class AsapList extends Information
 
@@ -358,9 +346,6 @@ module.exports = (connectionString) ->
 				text: 'DELETE FROM asaplist WHERE id=$1;'
 				values: [@id]
 
-		@getAll: (cb, t) =>
-			queryMany cb, t,
-				text: 'SELECT * FROM asaplistview;'
 		###
 	class SocialEntity extends Information
 
@@ -540,6 +525,7 @@ module.exports = (connectionString) ->
 		Note: Note
 		Asap: Asap
 		Information: Information
+		Task: Task
 		Project: Project
 		AsapList: AsapList
 		###	

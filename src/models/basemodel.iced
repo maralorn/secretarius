@@ -44,6 +44,35 @@ model.ModelObject = class ModelObject
 	delete: ->
 		@emit "deleted"
 
+	cbs = {}
+	@on: (event, cb) ->
+		cbs[@name] = {} unless cbs[@name]?
+		obj = cbs[@name]
+		obj[event] = [] unless obj[event]?
+		obj[event].push cb unless cb in obj[event]
+	
+	@emit: (event, data) ->
+		if cbs[@name]?[event]?
+			for cb in cbs[@name][event]
+#				try
+					cb data
+#				catch err
+#					@removeCb event, cb
+		
+	@removeCb: (event, cb) ->
+		cbs[@name][event] = (elem for elem in cbs[@name][event] when elem isnt cb)
+		delete cbs[@name][event] if cbs[@name][event] == []
+		debug event, "callback removed", @name
+
+	@onChanged: (cb) ->
+		@on("changed", cb)
+			
+	@onDeleted: (cb) ->
+		@on("deleted", cb)
+
+	@change: (data) ->
+		@emit "changed", data
+
 class InfoCache
 	constructor: ->
 		@infos = {}

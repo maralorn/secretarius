@@ -68,24 +68,24 @@ module.exports = (app, model) ->
 				if error? then debug error; return
 				@submit data
 				
-	changeclient = new SimpleNotifyClient "infochange", func (autocb, msg) ->
+	changedclient = new SimpleNotifyClient 'changed', func (autocb, msg) ->
 		await model.cache.getInformation defer(info), msg
 		await info.get defer values
 		JSON.stringify values
 
-	deleteclient = new SimpleNotifyClient "infodeleted", func (autocb, msg) ->
-		console.log 'delete', msg
-		JSON.stringify
-			id: msg
+	newclient = new SimpleNotifyClient 'new', func (autocb, msg) -> msg
 
-	inboxclient = new SimpleNotifyClient "inboxchange", func (autocb, msg) ->
+	deletedclient = new SimpleNotifyClient 'deleted', func (autocb, msg) -> msg
+
+	inboxclient = new SimpleNotifyClient 'inbox', func (autocb, msg) ->
 		await model.inbox.get defer answer
 		JSON.stringify
 			size: answer.size
 			first: answer.first?.id
 	
-	app.get "/sseupdate", (req, res) ->
+	app.get '/sseupdate', (req, res) ->
 		new Socket(req, res)
-			.addClient(changeclient)
+			.addClient(changedclient)
 			.addClient(inboxclient)
-			.addClient(deleteclient)
+			.addClient(newclient)
+			.addClient(deletedclient)

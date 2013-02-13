@@ -17,6 +17,7 @@ broadcast = (name) ->
 			port.postMessage msg
 
 sse = new EventSource("/sseupdate")
-sse.addEventListener 'infochange', broadcast('info'), false
-sse.addEventListener 'inboxchange', broadcast('inbox'), false
-sse.addEventListener 'infodeleted', broadcast('deleted'), false
+sse.addEventListener 'changed', broadcast('changed'), false
+sse.addEventListener 'inbox', broadcast('inbox'), false
+sse.addEventListener 'deleted', broadcast('deleted'), false
+sse.addEventListener 'new', broadcast('new'), false

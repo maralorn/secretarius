@@ -107,6 +107,10 @@ module.exports = (app, model) ->
 		before: (cb, req) -> cb null, [if req.body.delay isnt '' then new Date req.body.delay else null]
 		method: model.Information::setDelay,
 
+			method: model.Information.getAllIDs,
+
+		method: model.Information.getAll,
+
 			before: con = func (autocb, req) -> [req.body.content]
 			after: afterOnPost
 			method: model.Note::create,
@@ -143,10 +147,6 @@ module.exports = (app, model) ->
 
 		method: model.Project::uncollapse,
 	
-			method: model.Project.getAll,
-
-		method: model.Project.getActive,
-	
 			before: func (autocb, req) ->
 				await
 					model.cache.getInformation defer(list), req.body.list
@@ -166,14 +166,6 @@ module.exports = (app, model) ->
 				[list]
 			method: model.Asap::setList,
 
-		method: model.Asap.getAll,
-
-			method: model.Asap.getActive,
-
-		before: listfn
-		method: model.Asap.getActiveFromList,
-
-			method: model.AsapList.getAll,
 
 		before: name = func (autocb, req) ->
 			debug req.body.name

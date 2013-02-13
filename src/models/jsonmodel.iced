@@ -4,13 +4,17 @@ iced = require 'myiced'
 iced.util.pollute window
 
 updatecb = (event) ->
+	data = event.data.data
 	switch event.data.name
-		when 'info'
-			model.cache.updateInfo event.data.data
+		when 'changed'
+			model.cache.updateInfo data
 		when 'inbox'
-			model.inbox._store (-> return), event.data.data
+			model.inbox._store (-> return), data
 		when 'deleted'
-			model.cache.delete event.data.data.id
+			model.cache.delete data.id
+			model.getClassByType(data.type).deleted data.id
+		when 'new'
+			model.getClassByType(data.type).new data.id
 
 port = new SharedWorker('worker.js').port
 port.addEventListener 'message', updatecb
@@ -121,6 +125,26 @@ class Information extends PGObject
 		(@[key] = value) for key,value of values
 		@change values
 
+	@getAll: singlify func (autocb) ->
+		await getInfos defer(all), this, 'all'
+		ids[@name] = (info.id for info in all)
+
+	ids = []
+	@getAllIDs: singlify func (autocb) ->
+		unless ids[@name]?
+			await @getAll defer()
+		ids[@name]
+	
+	@new: (id) ->
+		if ids[@name]
+			ids[@name].push id
+			@change ids[@name]
+		
+	@deleted: (id) ->
+		if ids[@name]
+			ids[@name] = (i for i in ids[@name] when i isnt id)
+			@change ids[@name]
+
 class File extends PGObject
 	create: (name) ->
 	getName: ->
@@ -165,12 +189,6 @@ class Project extends Task
 		@_patch cb,
 			method: 'uncollapse'
 
-	@getActive: (cb) =>
-		getInfos	cb, this, 'active'
-
-	@getAll: (cb) =>
-		getInfos	cb, this, 'all'
-
 class Asap extends Task
 	create: (cb, description, list, referencing=null, project=null) ->
 		@_create cb,
@@ -189,16 +207,6 @@ class Asap extends Task
 			list: list.id
 			method: 'setList'
 
-	@getAllFromList: (cb, list) =>
-		getInfos cb, this, 'allFromList',
-			list: list.id
-
-	@getAll: (cb) =>
-		getInfos cb, this, 'all'
-
-	@getActive: (cb) =>
-		getInfos cb, this, 'active'
-
 class AsapList extends Information
 	create: (cb, name) ->
 		@_create cb,
@@ -208,9 +216,6 @@ class AsapList extends Information
 		@_patch cb,
 			method: "rename"
 			name: name
-
-	@getAll: (cb) =>
-		getInfos cb, this, 'all'
 
 class SocialEntity extends Information
 	create: ->
@@ -345,6 +350,7 @@ model.extend
 	File: File
 	Note: Note
 	Asap: Asap
+	Task: Task
 	Information: Information
 	Project: Project
 	AsapList: AsapList

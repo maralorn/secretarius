@@ -116,7 +116,7 @@ for state in ['new', 'old']:
 		plpy.execute(plan, [id])
 """
 
-func notify:
+func changed:
 	return: TRIGGER
 	lang: python
 	body:"""
@@ -126,14 +126,32 @@ for state in ['new', 'old']:
 		ids.add(TD[state]['id'])
 ids.discard(None)
 for id in ids:
-	plpy.execute("NOTIFY infochange, '"+str(id)+"';")
+	plpy.execute("NOTIFY changed, '"+str(id)+"';")
 """
 
-func change:
+func notify:
 	return: TRIGGER
-	lang: python
-	body:"""
-plpy.execute("NOTIFY "+str(TD['args'][0])+"change;")
+	lang: coffee
+	body: """
+plv8.execute "NOTIFY \#{TG_ARGV[0]};"
+"""
+func new:
+	return: TRIGGER
+	lang: coffee
+	body: """
+msg =
+	type: TG_ARGV[0]
+	id: NEW.id
+plv8.execute "NOTIFY new, '\#{JSON.stringify msg}';"
+"""
+func deleted:
+	return: TRIGGER
+	lang: coffee
+	body: """
+msg =
+	type: TG_ARGV[0]
+	id: OLD.id
+plv8.execute "NOTIFY deleted, '\#{JSON.stringify msg}';"
 """
 func unnull:
 	return: 'uuid[]'
@@ -178,7 +196,6 @@ plan1 = plpy.prepare("DELETE FROM information WHERE id=$1;", ["uuid"])
 plan2 = plpy.prepare("INSERT INTO deleted (id) VALUES ($1);", ["uuid"])
 plpy.execute(plan2, [id])
 plpy.execute(plan1, [id])
-plpy.execute("NOTIFY infodeleted, '"+id+"';")
 """
 
 infotrigger =
@@ -238,13 +255,35 @@ trigger
 		events: ['insert']
 		table: 'infoview_table'
 		when: "new.active and new.status >= 'inbox'"
-		cmd: change('inbox')
+		cmd: notify('inbox')
 	info4:
 		events: ['delete']
 		table: 'infoview_table'
 		when: "old.active and old.status >= 'inbox'"
-		cmd: change('inbox')
+		cmd: notify('inbox')
 
+autotrigger = (table) ->
+	t = []
+	t.push
+		events: ['update']
+		table: table
+		cmd: setTimestamp()
+	t.push
+		events: ['insert']
+		table: "#{table}view_table"
+		cmd: changed()
+	t.push
+		events: ['insert']
+		table: table
+		cmd: global.new table
+	t.push
+		events: ['delete']
+		table: table
+		cmd: deleted table
+	tr = {}
+	for tri, i in t
+		tr["#{table}auto#{i}"] = tri
+	trigger tr
 # Files
 
 view fileview0: select
@@ -261,15 +300,7 @@ materializedView fileview:
 		attachments: {}
 		infoview_table: {}
 
-trigger
-	file0:
-		events: ['update']
-		table: 'file'
-		cmd: setTimestamp()
-	file1:
-		events: ['insert']
-		table: 'fileview_table'
-		cmd: notify()
+autotrigger 'file'
 
 materializedView noteview:
 	query: select
@@ -279,15 +310,7 @@ materializedView noteview:
 		note: {}
 		infoview_table: {}
 
-trigger
-	note0:
-		events: ['update']
-		table: 'note'
-		cmd: setTimestamp()
-	note1:
-		events: ['insert']
-		table: 'noteview_table'
-		cmd: notify()
+autotrigger 'note'
 
 materializedView taskview:
 	query: select
@@ -297,16 +320,7 @@ materializedView taskview:
 		task: {}
 		infoview_table: {}
 
-trigger
-	task0:
-		events: ['update']
-		table: 'task'
-		cmd: setTimestamp()
-
-view activetaskview: select
-		columns: '*'
-		from: 'taskview'
-		where: 'active and completed is null'
+autotrigger 'task'
 
 materializedView asapview:
 	query: select
@@ -316,20 +330,7 @@ materializedView asapview:
 		asap: {}
 		taskview_table: {}
 
-view activeasapview: select
-		columns: '*'
-		from: 'asapview'
-		where: 'active and completed is null'
-
-trigger
-	asap0:
-		events: ['update']
-		table: 'asap'
-		cmd: setTimestamp()
-	asap1:
-		events: ['insert']
-		table: 'asapview_table'
-		cmd: notify()
+autotrigger 'asap'
 
 view asaplistview0: select
 		columns: 'a.id, unnull(array_agg(t.id)) as asaps'
@@ -342,23 +343,15 @@ materializedView asaplistview:
 		from: 'infoview natural join asaplist natural join asaplistview0'
 	trigger:
 		asaplist: {}
-		asapview_table:
+		asap:
 			fields: ['asaplist']
 		infoview_table: {}
 
-trigger
-	asaplist0:
-		events: ['update']
-		table: 'asaplist'
-		cmd: setTimestamp()
-	asap1:
-		events: ['insert']
-		table: 'asaplistview_table'
-		cmd: notify()
+autotrigger 'asaplist'
 
 view projectview0: select
 		columns: 'p.id, unnull(array_agg(t.id)) as children'
-		from: 'project p left join activetaskview t on p.id = t.parent'
+		from: 'project p left join task t on p.id = t.parent'
 		groupBy: 'p.id'
 
 materializedView projectview:
@@ -367,20 +360,8 @@ materializedView projectview:
 		from: 'taskview natural join project natural join projectview0'
 	trigger:
 		project: {}
-		taskview_table:
-			fields: ['id','parent']
+		taskview_table: {}
+		task:
+			fields: ['parent']
 
-view activeprojectview: select
-		columns: '*'
-		from: 'projectview'
-		where: 'active and completed is null'
-
-trigger
-	project0:
-		events: ['update']
-		table: 'project'
-		cmd: setTimestamp()
-	project1:
-		events: ['insert']
-		table: 'projectview_table'
-		cmd: notify()
+autotrigger 'project'
