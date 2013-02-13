@@ -104,18 +104,17 @@ exports.WindowSlotGenerator = class WindowSlotGenerator extends SlotGenerator
 	@setDefault new this
 
 exports.Flippable = class Flippable
-	constructor: (@front, @back, @speed = 500) ->
+	constructor: (@front, @back) ->
 		@flipped = false
-		do @front?.show
-		do @back?.hide
+		@back?.addClass 'backside'
 	
 	showBack: =>
-		@front?.hide @speed
-		@back?.show @speed
+		@front?.addClass 'backside'
+		@back?.removeClass 'backside'
 
 	showFront: =>
-		@front?.show @speed
-		@back?.hide @speed
+		@front?.removeClass 'backside'
+		@back?.addClass 'backside'
 
 	toggle: =>
 		if @flipped = not @flipped
@@ -156,8 +155,8 @@ exports.TimePicker = class TimePicker
 		defaultTo @options, defaults
 		@node.html require('template/timepicker') @options
 		@node.addClass 'timepicker'
-		@outerFlip = new Flippable $('.front', @node), $('.back', @node)
-		@innerFlip = new Flippable $('.front > button', @node), $('.front > span', @node)
+		@outerFlip = new Flippable $('.front', @node), $('.back', @node), 0
+		@innerFlip = new Flippable $('.front > button', @node), $('.front > span', @node), 0
 		@outerFlip.addToggler $('button', @node)
 		@display = $('span.reltime', @node)
 		for unit of units
