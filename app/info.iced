@@ -13,7 +13,7 @@ exports.InfoView = class InfoView extends ui.View
 		@contentNode = $('.infocontent', @context)
 		await model.cache.getInformation defer(error, @info), @id
 		@info.onChanged @draw
-		@info.onDeleted @delcb = => do @slot.clear
+		@info.onDeleted @delcb = => do @slot.setView ''
 		info = @info
 		$(".setStatus > button", @context).click (ev) ->
 			do ev.preventDefault
