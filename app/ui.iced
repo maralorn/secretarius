@@ -41,7 +41,7 @@ exports.View = class View
 	@test: (viewname) ->
 		@_find(viewname)[0]?
 
-exports.DropArea = class Droparea
+exports.DropArea = class DropArea
 	constructor: (contentNode, cb) ->
 		contentNode.bind 'dragover', (ev) -> do ev.originalEvent.preventDefault
 		contentNode.bind 'drop', (ev) ->
