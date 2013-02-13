@@ -24,7 +24,7 @@ exports.WindowSlot = class WindowSlot extends ui.Slot
 					nowThreshold: 1000
 			try
 				do $clock.show
-				$clock.html "#{new Date.toLocaleString()} Inbox:#{model.inbox.values.size}"
+				$clock.html "#{new Date().toLocaleString()} Inbox:#{model.inbox.values.size}"
 			catch err
 				do $clock.hide
 		do runclock = -> setTimeout clock, 1000 - do new Date().getTime % 1000
