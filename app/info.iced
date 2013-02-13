@@ -112,7 +112,89 @@ class AsapListView extends InfoView
 		@slot.setTitle @info.name
 
 	drawContent: ->
+		@newname.val @info.name
+		await model.Asap.getAllIDs defer(error, ids)
+		@list.setList @info.asaps
 
 	initContent: ->
+		@contentNode.html do require 'template/asaplist'
+		@contentNode.addClass 'hideinactive'
+		active = true
+		togglebutton = $('button[name=toggleshow]')
+		togglebutton.click =>
+			if active
+				active = false
+				togglebutton.html 'Show only active'
+				@contentNode.removeClass 'hideinactive'
+			else
+				active = true
+				togglebutton.html 'Show all'
+				@contentNode.addClass 'hideinactive'
+			false
+		@newname = $('input[name=newname]', @contentNode)
+		$('form', @contentNode).submit (ev) =>
+			do ev.preventDefault
+			@info.rename (->), @newname.val()
+		new ui.AsapCreator $('.newtodo', @contentNode), @info
+
+		@list = new ui.InfoListManager $('tbody', @contentNode), (autocb, asap) =>
+			entry = $(require('template/listentry')())
+			refManager = new ui.ReferenceList $('.refs', entry), asap
+			delayPicker = new ui.TimePicker $('.delay', entry),
+				name: ''
+				change: (date) -> asap.setDelay (->), date
+			deadlinePicker = new ui.TimePicker $('.deadline', entry),
+				name: ''
+				change: (date) -> asap.setDeadline (->), date
+			listPicker = new ui.ListPicker $('td.listsel', entry)
+			listPicker.onChanged (list) ->
+				asap.setList (->), list
+			donebox = $('input[type=checkbox]', entry)
+			donebox.click -> if donebox.is(':checked') then asap.done (->) else asap.undo (->)
+			desclabel = $('.desc > span', entry)
+			descform = $('.desc > form', entry)
+			descinput = $('.desc > form > input', entry)
+			descform.submit (ev) ->
+				do ev.preventDefault
+				await asap.setDescription defer(error), descinput.val()
+				do descFlippable.showFront unless error?
+			descFlippable = new ui.Flippable desclabel, descform, 0
+			descFlippable.addToggler desclabel
+			last = $('.last', entry)
+			create = $('.create', entry)
+			project = $('.project', entry)
+			new ui.DropArea project, (viewname) ->
+				if (id = /project:(.*)$/.exec(viewname)?[1])?
+					await model.cache.getInformation defer(error, parent), id
+					unless error? or not parent?
+						asap.setParent (->), parent
+			$('td > button[name=delete]', entry).click -> (asap.setStatus (->), 'delete' if confirm 'Really delete?')
+			asap.onChanged set = (asap) ->
+				if asap.completed? or not asap.active
+					entry.addClass('inactive')
+				else
+					entry.removeClass('inactive')
+				if not asap.completed? and asap.overdue
+					$('.deadline', entry).addClass 'overdue'
+				else
+					$('.deadline', entry).removeClass 'overdue'
+				donebox.prop('checked', asap.completed?)
+				desclabel.html asap.description
+				descinput.val asap.description
+				if asap.references?
+					refManager.setList asap.references
+				await model.cache.getInformation defer(error, parent), asap.parent
+				project.html if parent? then ui.createInfoButton parent, false, (-> asap.setParent (->), null) else ''
+				delayPicker.setDate if asap.delay? then new Date asap.delay else null
+				deadlinePicker.setDate if asap.deadline? then new Date asap.deadline else null
+				last.attr 'x-time', asap.lastEdited
+				create.attr 'x-time', asap.createdAt
+				listPicker.sel asap.asaplist
+			set asap
+			entry
 
 	save: ->
+
+class TaskList extends ui.InfoListManager
+	constructor: (node) ->
+		

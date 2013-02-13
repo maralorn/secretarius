@@ -72,9 +72,21 @@ select {
 	text-align: right;
 }
 
+.overdue{
+	background: #220011;
+}
+
+.hideinactive .inactive{
+	display: none;
+}
 
 .backside {
 	display: none;
+}
+
+td{
+	-webkit-transition: all 0.5s ease;
+	transition: all 0.5s ease;
 }
 
 h1{
@@ -85,6 +97,9 @@ h1{
 	.color3;
 	float: left;
 }
+
+table{ width: 100%; }
+td{ text-align: center; }
 
 #clock{
 	float: right;
