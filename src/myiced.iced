@@ -96,11 +96,12 @@ exports.util.singlify = singlify = (func) ->
 	calls = []
 	(cb, args...) ->
 		for call in calls
-			if arrayEqual args, call.args
+			if arrayEqual(args, call.args) and call.context is this
 				return call.cbs.push cb
 		calls.push call =
 			args: args
 			cbs: [cb]
+			context: this
 		caller = (args...) ->
 			calls = (cl for cl in calls when cl isnt call)
 			for cb in call.cbs
