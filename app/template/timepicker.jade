@@ -1,7 +1,9 @@
 .front
 	button Set #{name}
 	span 
+		- if (name != '')	{
 		| #{name}:
+		- }
 		span.reltime
 		button Change
 .back
