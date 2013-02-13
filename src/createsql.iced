@@ -312,9 +312,22 @@ materializedView noteview:
 
 autotrigger 'note'
 
+func task_overdue:
+	args: ["deadline timestamptz"]
+	return: BOOLEAN
+	lang: sql
+	body: "begin return (deadline < current_timestamp and deadline is not null); end;"
+
+func task_expires:
+	args: ["delay timestamptz, deadline timestamptz"]
+	return: TIMESTAMPTZ
+	lang: sql
+	body: "begin return least(info_expires(deadline), info_expires(delay)); end;"
+
+
 materializedView taskview:
 	query: select
-		columns: '*, info_expires(delay) as expires'
+		columns: '*, task_overdue(deadline) as overdue, task_expires(deadline, delay) as expires'
 		from: 'infoview natural join task'
 	trigger:
 		task: {}
@@ -324,7 +337,7 @@ autotrigger 'task'
 
 materializedView asapview:
 	query: select
-		columns: '*, info_expires(delay) as expires'
+		columns: '*, task_expires(deadline, delay) as expires'
 		from: 'taskview natural join asap'
 	trigger:
 		asap: {}
@@ -334,7 +347,7 @@ autotrigger 'asap'
 
 view asaplistview0: select
 		columns: 'a.id, unnull(array_agg(t.id)) as asaps'
-		from: 'asaplist a left join activeasapview t on a.id = t.asaplist'
+		from: 'asaplist a left join asap t on a.id = t.asaplist'
 		groupBy: 'a.id'
 
 materializedView asaplistview:
@@ -356,7 +369,7 @@ view projectview0: select
 
 materializedView projectview:
 	query: select
-		columns: '*, info_expires(delay) as expires'
+		columns: '*, task_expires(deadline, delay) as expires'
 		from: 'taskview natural join project natural join projectview0'
 	trigger:
 		project: {}

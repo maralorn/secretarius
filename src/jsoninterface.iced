@@ -129,6 +129,10 @@ module.exports = (app, model) ->
 
 		method: model.Information::get,
 
+			method: model.Task::done,
+
+		method: model.Task::undo,
+
 			before: func (autocb, req) ->
 				await
 					model.cache.getInformation defer(referencing), req.body.referencing
@@ -136,7 +140,12 @@ module.exports = (app, model) ->
 				[req.body.description, referencing, parent]
 			after: afterOnPost
 			method: model.Project::create,
+			
+		before: func (autocb, req) -> [if req.body.deadline isnt '' then new Date req.body.deadline else null]
+		method: model.Task::setDeadline,
 
+			before: func (autocb, req) -> [req.body.description]
+			method: model.Task::setDescription,
 
 		before: func (autocb, req) ->
 			await model.cache.getInformation defer(parent), req.body.parent

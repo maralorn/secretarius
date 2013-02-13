@@ -108,16 +108,16 @@ module.exports = (connectionString) ->
 			config.func = 'queryMany'
 			query cb, config
 
-	timeOutID = null
-	do triggerInboxchangeOnDelay = ->
-		clearTimeout timeOutID
-		await queryMany defer(error, res), null,
-			text: 'SELECT delay FROM information WHERE delay > CURRENT_TIMESTAMP ORDER BY delay LIMIT 1;'
-		if res.length > 0
-			timeOutID = setTimeout (->
-				queryNone (->), null,
-					text: 'NOTIFY inboxchange;'), new Date(res[0].delay).getTime() - new Date().getTime()
-	listen 'inboxchange', triggerInboxchangeOnDelay
+#	timeOutID = null
+#	do triggerInboxchangeOnDelay = ->
+#		clearTimeout timeOutID
+#		await queryMany defer(error, res), null,
+#			text: 'SELECT delay FROM information WHERE delay > CURRENT_TIMESTAMP ORDER BY delay LIMIT 1;'
+#		if res.length > 0
+#			timeOutID = setTimeout (->
+#				queryNone (->), null,
+#					text: 'NOTIFY inboxchange;'), new Date(res[0].delay).getTime() - new Date().getTime()
+#	listen 'inboxchange', triggerInboxchangeOnDelay
 
 	class PGObject extends model.ModelObject
 		constructor: (@id) ->
@@ -274,12 +274,12 @@ module.exports = (connectionString) ->
 				text: 'INSERT INTO task (id, description, parent) VALUES ($1, $2, $3);'
 				after: func (autocb) => @id
 
-		done: (cb, t) =>
+		done: (cb, t) ->
 			queryNone cb, t,
 				text: 'UPDATE task SET completed=CURRENT_TIMESTAMP WHERE id=$1'
 				values: [@id]
 
-		undo: (cb, t) =>
+		undo: (cb, t) ->
 			queryNone cb, t,
 				text: 'UPDATE task SET completed=NULL WHERE id=$1'
 				values: [@id]
@@ -288,6 +288,16 @@ module.exports = (connectionString) ->
 			queryNone cb, t,
 				text: 'UPDATE task SET parent=$2 WHERE id=$1;'
 				values: [@id, if parent? then parent.id else null]
+
+		setDeadline: (cb, deadline, t) ->
+			queryNone cb, t,
+				text: "UPDATE task SET deadline=$2 WHERE id=$1;"
+				values: [@id, if deadline? then do deadline.toISOString else null]
+
+		setDescription: (cb, description, t) ->
+			queryNone cb, t,
+				text: 'update task set description=$2 where id=$1'
+				values: [@id, description]
 
 
 	class Project extends Task
@@ -345,7 +355,6 @@ module.exports = (connectionString) ->
 			queryNone cb, t,
 				text: 'DELETE FROM asaplist WHERE id=$1;'
 				values: [@id]
-
 		###
 	class SocialEntity extends Information
 

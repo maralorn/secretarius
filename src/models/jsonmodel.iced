@@ -169,17 +169,28 @@ class Task extends Information
 		@_patch cb,
 			method: 'undo'
 
+	setParent: (cb, parent) ->
+		@_patch cb,
+			parent: parent?.id
+			method: 'setParent'
+
+	setDeadline: (cb, deadline) ->
+		@_patch cb,
+			method: "setDeadline"
+			deadline: deadline
+
+	setDescription: (cb, description) ->
+		@_patch cb,
+			method: "setDescription"
+			description: description
+		
+
 class Project extends Task
 	create: (cb, description, referencing=null, parent=null) ->
 		@_create cb,
 			description: description
 			referencing: referencing?.id
 			parent: parent?.id
-
-	setParent: (parent) ->
-		@_patch cb,
-			parent: parent?.id
-			method: 'setParent'
 
 	collapse: (cb) ->
 		@_patch cb,
@@ -196,11 +207,6 @@ class Asap extends Task
 			list: list.id
 			referencing: referencing?.id
 			project: project?.id
-
-	setProject: (cb, project) ->
-		@_patch cb,
-			project: project?.id
-			method: 'setProject'
 
 	setList: (cb, list) ->
 		@_patch cb,
