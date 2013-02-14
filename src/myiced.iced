@@ -36,10 +36,13 @@ exports.cb2throw = cb2throw = (cb, args...) ->
 	for arg in args
 		if arg?
 			do console.trace
-			throwError 'cb2throw can only take one parameter.'
+			throw 'cb2throw can only take one parameter.'
 	(args...) ->
 		if args[0]?
-			handler.handle args[0]
+			if handler?
+				handler.handle args[0]
+			else
+				throw args[0]
 		else
 			cb.apply this, args[1..]
 
