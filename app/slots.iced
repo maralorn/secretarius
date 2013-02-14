@@ -6,11 +6,12 @@ ui = require 'ui'
 exports.WindowSlot = class WindowSlot extends ui.Slot
 	constructor: (viewname) ->
 		model.inbox.get -> return
-		menu = ['inbox', '']
+		menu = ['','inbox', 'projects']
 		labels = {}
 		await for dish in menu
 			ui.label defer(error, labels[dish]), dish
 		$('body').html require('template/body') {menu: (labels[dish] for dish in menu)}
+		new ui.AsapListsList $('#menu')
 		for dish in menu
 			emitter = new ui.Emitter $("#menu > button:contains('#{labels[dish]}')")
 			emitter.setViewName dish
