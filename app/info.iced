@@ -169,6 +169,7 @@ class AsapListView extends InfoView
 					unless error? or not parent?
 						asap.setParent (->), parent
 			$('td > button[name=delete]', entry).click -> (asap.setStatus (->), 'delete' if confirm 'Really delete?')
+			delparent = -> asap.setParent (->), null
 			asap.onChanged set = (asap) ->
 				if asap.completed? or not asap.active
 					entry.addClass('inactive')
@@ -184,7 +185,7 @@ class AsapListView extends InfoView
 				if asap.references?
 					refManager.setList asap.references
 				await model.cache.getInformation defer(error, parent), asap.parent
-				project.html if parent? then ui.createInfoButton parent, false, (-> asap.setParent (->), null) else ''
+				project.html if parent? then ui.createInfoButton parent, false, delparent else ''
 				delayPicker.setDate if asap.delay? then new Date asap.delay else null
 				deadlinePicker.setDate if asap.deadline? then new Date asap.deadline else null
 				last.attr 'x-time', asap.lastEdited
