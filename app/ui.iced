@@ -329,9 +329,15 @@ exports.AsapCreator = class AsapCreator
 		form.submit (ev) =>
 			do ev.preventDefault
 			await
-				projectPicker.getInfo defer error, @project unless @project?
-				listPicker.getInfo defer error, @list unless @list?
-			new model.Asap().create (-> desc.val ''), desc.val(), @list, @reference, @project
+				if @project?
+					project = @project
+				else
+					projectPicker.getInfo defer error, project
+				if @list?
+					list = @list
+				else
+					listPicker.getInfo defer error, list
+			new model.Asap().create (-> desc.val ''), desc.val(), list, @reference, project
 		
 	setList: (@list) ->
 	setProject: (@project) ->
@@ -345,8 +351,12 @@ exports.ProjectCreator = class ProjectCreator
 		parentPicker = new ProjectPicker $('.parentpicker', node)
 		form.submit (ev) =>
 			do ev.preventDefault
-			await parentPicker.getInfo defer error, @parent unless @parent?
-			new model.Project().create (-> desc.val ''), desc.val(), @reference, @parent
+			await
+				if @parent?
+					parent = @parent
+				else
+					await parentPicker.getInfo defer error, parent
+			new model.Project().create (-> desc.val ''), desc.val(), @reference, parent
 	setParent: (@parent) ->
 	setReference: (@reference) ->
 		
