@@ -83,7 +83,7 @@ table project:
 		type: BOOLEAN
 		default: false
 		null: false
-	_append: "alter table task add column parent uuid references project(id);"
+	_append: "alter table task add column parent uuid references project(id) on delete set null;"
 
 table asap:
 	_extends: task
@@ -324,6 +324,27 @@ func task_expires:
 	lang: sql
 	body: "begin return least(info_expires(deadline), info_expires(delay)); end;"
 
+console.log """
+create or replace view taskParents as
+	with recursive rel(id, parent) as (
+		select id, parent from task
+			where parent is distinct from null
+	union
+		select a.id,b.parent from rel a, task b 
+			where (a.parent = b.id and b.parent is distinct from null))
+	select * from rel;"""
+
+func catchCycles:
+	return: TRIGGER
+	lang: coffee
+	body: """
+count = 0
+if NEW.parent?
+	[count: count] = plv8.execute "select count(*) from taskParents where id='\#{NEW.parent}' and parent='\#{NEW.id}';"
+return NEW if count is 0 and NEW.id isnt NEW.parent
+throw 'Parent cycle detected.'"""
+
+console.log 'create trigger catchCycles before update or insert on task for each row execute procedure catchCycles();'
 
 materializedView taskview:
 	query: select
