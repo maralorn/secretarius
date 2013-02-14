@@ -54,6 +54,14 @@ button:hover, .active{
 	.color3i;
 }
 
+.task{
+	clear: both;
+	border-top: 2px dotted @bg3;
+	.children {
+		border-left: 3px solid @fg3;
+	}
+}
+
 body{
 	.color3;
 }
@@ -79,9 +87,12 @@ select {
 .hideinactive .inactive{
 	display: none;
 }
+.hidechildren > .tasklist > .hasparent{
+	display: none;
+}
 
 .backside {
-	display: none;
+	display: none !important;
 }
 
 td{
@@ -141,6 +152,14 @@ span.reltime {
 	padding: 0.2em;
 	margin-right: 0.5em;
 	margin-bottom: 0.5em;
+}
+
+.children {
+	margin-left: 2em;
+}
+
+.projecthandle > form {
+	display: inline-block;
 }
 
 textarea{

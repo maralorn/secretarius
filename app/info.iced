@@ -93,16 +93,6 @@ class NoteView extends InfoView
 			else
 				msg.html 'Saved!'
 
-class ProjectView extends InfoView
-	@registerView /^project:(.*)$/, this, func (autocb, match) ->
-		await model.cache.getInformation defer(project), match[1]
-		"Project: #{project.description}"
-
-class AsapView extends InfoView
-	@registerView /^asap:(.*)$/, this, func (autocb, match) ->
-		await model.cache.getInformation defer(asap), match[1]
-		"ToDo: #{asap.description}"
-
 class AsapListView extends InfoView
 	@registerView /^asaplist:(.*)$/, this, func (autocb, match) ->
 		await model.cache.getInformation defer(list), match[1]
@@ -196,4 +186,140 @@ class AsapListView extends InfoView
 
 class TaskList extends ui.InfoListManager
 	constructor: (node) ->
-		
+		super node, (autocb, task) ->
+			entry = $(require("template/#{task.type}")())
+			$('button[name=delete]', entry).click -> (task.setStatus (->), 'delete' if confirm 'Really delete?')
+			donebox = $('input[name=completed]', entry)
+			donebox.click -> if donebox.prop('checked') then task.done (->) else task.undo (->)
+			switch task.type
+				when 'project'
+					collapsebutton = $('button.collapse', entry)
+					collapsebutton.click (ev) ->
+						do ev.preventDefault
+						if task.collapsed
+							task.uncollapse (->)
+						else
+							task.collapse (->)
+					childrenList = new TaskList $('.children', entry)
+					desclabel = $('form > span.name', entry)
+					descinput = $('form > input', entry)
+					descform = $('form', entry)
+					descform.submit (ev) ->
+						do ev.preventDefault
+						if descFlippable.flipped
+							await task.setDescription defer(error), descinput.val()
+						do descFlippable.toggle unless error?
+					descFlippable = new ui.Flippable desclabel, descinput
+					draw = (project) ->
+						collapsebutton.html if project.collapsed then '>' else 'v'
+						childrenList.setList if project.collapsed or not project.children? then [] else project.children
+						desclabel.html project.description
+						descinput.val project.description
+					new ui.DropArea $('.projecthandle', entry), (viewname) ->
+						if (id = /(asap|project):(.*)$/.exec(viewname)?[2])?
+							await model.cache.getInformation defer(error, child), id
+							unless error? or not child?
+								child.setParent (->), task
+					new ui.Emitter(desclabel).setViewName "project:#{task.id}"
+				when 'asap'
+					$('span.description', entry).html ui.createInfoButton task
+					listid = null
+					draw = (asap) ->
+						if listid isnt asap.asaplist and asap.asaplist?
+							listid = asap.asaplist
+							await model.cache.getInformation defer(error, list), listid
+							$('span.list', entry).html ui.createInfoButton list
+			drawboth = (task) ->
+				donebox.prop 'checked', task.completed?
+				if task.active and not task.completed?
+					entry.removeClass 'inactive'
+				else
+					entry.addClass 'inactive'
+				if task.parent?
+					entry.addClass 'hasparent'
+				else
+					entry.removeClass 'hasparent'
+
+
+			task.onChanged draw
+			task.onChanged drawboth
+			draw task
+			drawboth task
+			entry
+
+class TaskView extends InfoView
+	drawContent: ->
+	initContent: ->
+		@contentNode.html require('template/taskview')()
+		@contentNode.addClass 'hideinactive'
+		active = true
+		togglebutton = $('button[name=toggleshow]')
+		togglebutton.click =>
+			if active
+				active = false
+				togglebutton.html 'Show only active'
+				@contentNode.removeClass 'hideinactive'
+			else
+				active = true
+				togglebutton.html 'Show all'
+				@contentNode.addClass 'hideinactive'
+			false
+		new ui.DropArea $('.root', @contentNode), (viewname) ->
+			if (id = /(asap|project):(.*)$/.exec(viewname)?[2])?
+				await model.cache.getInformation defer(error, child), id
+				unless error? or not child?
+					child.setParent (->), null
+		new TaskList($('.tasklist', @contentNode)).setList [@info.id]
+
+class ProjectView extends TaskView
+	@registerView /^project:(.*)$/, this, func (autocb, match) ->
+		await model.cache.getInformation defer(project), match[1]
+		"Project: #{project.description}"
+
+	drawTitle: ->
+		@slot.setTitle "Project: #{@info.description}"
+
+class AsapView extends InfoView
+	@registerView /^asap:(.*)$/, this, func (autocb, match) ->
+		await model.cache.getInformation defer(asap), match[1]
+		"ToDo: #{asap.description}"
+
+	drawTitle: ->
+		@slot.setTitle "To Do"
+
+class ProjectsView extends ui.View
+	@registerView /^projects$/, this, func (autocb) -> 'Projects'
+
+	constructor: (@slot) ->
+		@contentNode = @slot.getContentNode()
+		@slot.setTitle "Projects"
+		@contentNode.html require('template/taskview')()
+		@contentNode.append creator = $('<div/>')
+		new ui.ProjectCreator creator
+		@contentNode.append creator = $('<div/>')
+		new ui.AsapCreator creator
+		@contentNode.append creator = $('<div/>')
+		new ui.AsapListCreator creator
+		@contentNode.addClass 'hideinactive hidechildren'
+		active = true
+		togglebutton = $('button[name=toggleshow]')
+		togglebutton.click =>
+			if active
+				active = false
+				togglebutton.html 'Show only active'
+				@contentNode.removeClass 'hideinactive'
+			else
+				active = true
+				togglebutton.html 'Show all'
+				@contentNode.addClass 'hideinactive'
+			false
+		@projectList = new TaskList $('.tasklist', @contentNode)
+		new ui.DropArea $('.root', @contentNode), (viewname) ->
+			if (id = /(asap|project):(.*)$/.exec(viewname)?[2])?
+				await model.cache.getInformation defer(error, child), id
+				unless error? or not child?
+					child.setParent (->), null
+		model.Project.getAllIDs catchNull @projectList.setList
+		model.Project.onChanged @projectList.setList
+
+	delete: ->
