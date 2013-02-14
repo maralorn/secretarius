@@ -198,7 +198,7 @@ exports.ListManager = class ListManager
 	constructor: (@node, @creator) ->
 		@elements = {}
 		
-	setList: (list) ->
+	setList: (list) =>
 		for id in list when id not of @elements
 			await @creator defer(element), id
 			unless id of @elements
@@ -251,7 +251,6 @@ exports.InfoClassListManager = class InfoClassListManager extends InfoListManage
 	constructor: (node, cls, creator) ->
 		super node, creator
 		cls.onChanged @setList
-	#	await cls.getAll defer(error)
 		await cls.getAllIDs defer(error, ids)
 		@setList ids
 		

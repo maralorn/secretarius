@@ -194,8 +194,6 @@ class AsapListView extends InfoView
 			set asap
 			entry
 
-	save: ->
-
 class TaskList extends ui.InfoListManager
 	constructor: (node) ->
 		
