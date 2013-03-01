@@ -88,7 +88,7 @@ task 'stitch', 'Build secretarius.js from src/ and app/', ->
 					]
 
 task 'clear', 'Delete lib', ->
-	rm libdir
+	rm './lib'
 
 task 'watch', 'Rebuild everything if change is noted', ->
 	deadtime = false

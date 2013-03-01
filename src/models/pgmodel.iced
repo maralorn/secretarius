@@ -32,8 +32,11 @@ module.exports = (connectionString) ->
 		begin: =>
 			@client.query 'begin'
 
-		commit: =>
-			@client.query 'commit'
+		commit: (autocb) =>
+			await
+				@client.query('commit').on 'end', defer()
+
+
 
 		rollback: =>
 			@client.query 'rollback'
@@ -90,7 +93,7 @@ module.exports = (connectionString) ->
 			if config.after?
 				await config.after.call this, defer(result), res, t
 				res = result if result?
-			t.commit() unless transaction?
+			await t.commit addNull(defer()) unless transaction?
 			res
 
 	queryNone = (cb, transaction, config) ->
