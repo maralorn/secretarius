@@ -10,6 +10,7 @@ if argv.debug
 	do util.enableDebugMode
 
 http = require 'http'
+path = require 'path'
 
 express = require 'express'
 
@@ -28,12 +29,14 @@ app.use (req, res, next) ->
 	do next
 
 app.use express.compress()
-app.use express.static "#{__dirname}/client"
 app.use express.cookieParser()
 app.use express.cookieSession secret: "secret-#{Math.random()}"
+app.use express.static path.normalize "#{__dirname}/../client"
 app.use express.bodyParser()
 
 app.use app.router
+
+app.get '/require', (req, res) -> dispatcher null, req, res
 
 json app, model
 sse app, model

@@ -1,0 +1,183 @@
+.color1 {
+  color: #00000f;
+  background: #9999ee;
+}
+.color1i {
+  color: #9999ee;
+  background: #00000f;
+}
+.color2 {
+  color: #ffffff;
+  background: #000044;
+}
+.color2i {
+  color: #000044;
+  background: #00000f;
+}
+.color3 {
+  color: #9999ff;
+  background: #00000f;
+}
+.color3i {
+  color: #00000f;
+  background: #9999ff;
+}
+* {
+  padding: 0;
+  margin: 0;
+  font-size: 6pt;
+  font-family: Fixed, monospace;
+}
+@font-face {
+  font-family: baar_sophia;
+  src: url('Clockopia.ttf');
+}
+button {
+  border: 0.1em solid #00000f;
+  color: #9999ff;
+  background: #00000f;
+  padding: 0.3em;
+  margin: 0em 0.3em 0.3em 0;
+}
+button:hover,
+.active {
+  color: #00000f;
+  background: #9999ff;
+}
+.task {
+  clear: both;
+  border-top: 2px dotted #00000f;
+}
+.task .children {
+  border-left: 3px solid #9999ff;
+}
+body {
+  color: #9999ff;
+  background: #00000f;
+}
+input,
+select,
+option {
+  border: 0.1em solid #00000f;
+  color: #ffffff;
+  background: #000044;
+  padding: 0.3em;
+  margin: 0em 0em 0.3em 0;
+  outline: none;
+}
+select {
+  margin: 0.5em;
+}
+.timepicker input {
+  text-align: right;
+}
+.overdue {
+  background: #220011;
+}
+.hideinactive .inactive {
+  display: none;
+}
+.hidechildren > .tasklist > .hasparent {
+  display: none;
+}
+.backside {
+  display: none !important;
+}
+td {
+  -webkit-transition: all 0.5s ease;
+  transition: all 0.5s ease;
+}
+h1 {
+  padding: 0.5em;
+  margin-right: 0.5em;
+  margin-bottom: 0.2em;
+  font-size: 9pt;
+  color: #9999ff;
+  background: #00000f;
+  float: left;
+}
+table {
+  width: 100%;
+}
+td {
+  text-align: center;
+}
+#clock {
+  float: right;
+}
+#msgcontainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  text-align: center;
+}
+#msgcontainer span {
+  display: inline-block;
+  text-align: center;
+  padding: 0.2em;
+  margin-top: 0.2em;
+  color: #00000f;
+  background: #9999ee;
+  border-radius: 0.3em;
+}
+span.reltime {
+  padding: 0em 1.5em 0em 0.5em;
+}
+.attachments,
+.references,
+.times {
+  color: #9999ff;
+  background: #00000f;
+  margin: 0.2em 0em;
+  padding: 0.5em;
+  clear: both;
+  overflow: auto;
+}
+.attachments > h2,
+.references > h2,
+.times > h2 {
+  font-size: 7.800000000000001pt;
+  float: left;
+  margin-right: 0.5em;
+  margin-bottom: 0.5em;
+}
+.referenceContainer > span {
+  color: #00000f;
+  background: #9999ee;
+  padding: 0.2em;
+  margin-right: 0.5em;
+  margin-bottom: 0.5em;
+}
+.children {
+  margin-left: 2em;
+}
+.projecthandle > form {
+  display: inline-block;
+}
+textarea {
+  border: 0px;
+  color: #9999ff;
+  background: #00000f;
+  outline: none;
+  resize: none;
+  width: 100%;
+  margin: 0.2em 0em;
+  padding: 0.5em;
+  overflow: hidden;
+  vertical-align: top;
+  -webkit-transition: height 0.5s;
+  font-size: 6pt;
+  font-family: Fixed, monospace;
+}
+#content,
+#header,
+#footer {
+  padding: 0.5em;
+  margin: 0.5em;
+  color: #ffffff;
+  background: #000044;
+  clear: both;
+  overflow: auto;
+  -webkit-transition: height 0.2s;
+}
