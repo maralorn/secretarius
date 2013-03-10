@@ -41,34 +41,35 @@ module.exports = (app, model) ->
 				when "PATCH"
 					object[req.body.method]
 
-		parse: (req, res, next) => ((_) =>
+		parse: (req, res, next) =>
 			util.debug req.method, req.url, req.query, req.body
-			try
-				object = @findObject req
-				return do next if object is null
-				method = @findMethod req, object
-				handler = null
-				for handlerobj in @methods
-					if handlerobj.method is method
-						handler = handlerobj
-				return do next unless handler?
-				if handler.before?
-					args = handler.before(_, req) or []
+			((_) =>
 				try
-					((cb) -> method.apply object, [cb].concat args) _
+					object = @findObject req
+					return do next if object is null
+					method = @findMethod req, object
+					handler = null
+					for handlerobj in @methods
+						if handlerobj.method is method
+							handler = handlerobj
+					return do next unless handler?
+					if handler.before?
+						args = handler.before(_, req) or []
+					try
+						((cb) -> method.apply object, [cb].concat args) _
+					catch error
+						if handler.catcher?
+							handler.catcher error
+						else
+							throw error
+					if handler.after?
+						result = handler.after _, result
+					res.json 200, if result? then result else {msg: "success"}
 				catch error
-					if handler.catcher?
-						handler.catcher error
-					else
-						throw error
-				if handler.after?
-					result = handler.after _, result
-				res.json 200, if result? then result else {msg: "success"}
-			catch error
-				res.json code,
-					msg: "Internal Error"
-					error: error
-				util.debug error)(->)
+					res.json code,
+						msg: "Internal Error"
+						error: error
+					util.debug error)(->)
 			
 	parser = new Parser
 

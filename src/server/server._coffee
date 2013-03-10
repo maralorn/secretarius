@@ -4,8 +4,10 @@ argv = require('optimist')
 	.default('debug', true)
 	.argv
 
+util = require('libsecretarius').util
+
 if argv.debug
-	do require('libsecretarius').util.enableDebugMode
+	do util.enableDebugMode
 
 http = require 'http'
 
