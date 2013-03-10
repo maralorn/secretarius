@@ -1,19 +1,25 @@
 {
-  "name": "secretarius",
+  "name": "secretarius-server",
   "description": "Tasks and Communication Manager",
   "version": "0.0.0",
   "author": "Malte Brandy <malte.brandy@maralorn.de>",
-  "main" : "./lib/main.js",
-  "dependencies": {
+  "main" : "./lib/server/server.js",
+  "devDependencies": {
+	"coffee-script":"",
 	"jade":">=0.27.6",
-	"express":">=3.0.0rc4",
-	"systemd":">=0.2.1",
-	"pg":">=0.8.4",
-	"iced-coffee-script":">=1.3.3e",
 	"stitch":">=0.3.3",
 	"less":">=1.3.0",
-	"uglify-js":">=1.3.3",
-	"optimist":">=0.3.5"
+	"uglify-js":">=1.3.3"
+  },
+  "dependencies": {
+	"express":">=3.0.0rc4",
+	"pg":">=0.8.4",
+	"optimist":">=0.3.5",
+	"streamline":"",
+	"libsecretarius":""
+  },
+  "scripts": {
+	  "prepublish": "./build.sh"
   },
   "keywords": [],
   "repository": "git://github.com/maralorn/secretarius"

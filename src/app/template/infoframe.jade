@@ -1,0 +1,21 @@
+.infocontent
+button(name='save') Save
+.options
+	.setStatus
+		button(name='delete') Delete
+		button(name='default') Normal
+		button(name='maybe') Maybe
+		button(name='inbox') Inbox
+		button(name='urgent') Urgent
+	.delay
+	.times
+		| Last Change:
+		span.reltime.last_edited
+		| Created:
+		span.reltime.created_at
+	.references
+		h2 References
+	.attachments
+		h2 Attachments
+		.upload
+button(name='options') Toggle Options
