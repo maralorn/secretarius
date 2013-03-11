@@ -3,7 +3,6 @@ DEADTIME = 500
 deadtime = false
 fs = require 'fs-extra'
 less = require 'less'
-stitch = require 'stitch'
 jade = require 'jade'
 glob = require 'glob'
 path = require 'path'
@@ -11,6 +10,7 @@ util = require('libsecretarius').util
 optimist = require 'optimist'
 browserify = require 'browserify'
 streamlineCompiler = require 'streamline/lib/compiler/compile'
+UglifyJS = require 'uglify-js'
 
 argv = require('optimist')
 	.boolean('debug')
@@ -92,32 +92,20 @@ for filepath, future of files
 buildapp = (_) ->
 	b = browserify()
 	b.add "#{__dirname}/lib/app/secretarius.js"
-	fs.writeFile 'lib/client/secretarius.js', b.bundle(_), _
+	code = b.bundle _
+	unless argv.debug
+		ast = UglifyJS.parse code
+		do ast.figure_out_scope
+		compressor = UglifyJS.Compressor()
+		ast = ast.transform compressor
+		do ast.figure_out_scope
+		do ast.compute_char_frequency
+		do ast.mangle_names
+		code = ast.print_to_string()
+	fs.writeFile 'lib/client/secretarius.js', code, _
 	console.log new Date().toLocaleString(), 'built', 'lib/client/secretarius.js'
-buildapp _
+f = buildapp()
 fs.copy require.resolve('libsecretarius/lib/events'), 'lib/client/events.js', _
 console.log new Date().toLocaleString(), 'built', 'lib/client/events.js'
-
-###
-task 'stitch', 'Build secretarius.js from src/ and app/', ->
-	stitch_ = stitch.createPackage
-		paths: ['buildapp', 'vendor']
-	rm 'lib/client/secretarius.min.js'
-	rm 'buildapp', ->
-		files = ("./src/#{file}.iced" for file in appfiles)
-		cp 'app/', 'buildapp/', ->
-			cp.apply null, files.concat ['buildapp', ->
-				stitch_.compile (error, js) ->
-					if error?
-						console.log error
-					else
-						fs.writeFileSync "./lib/client/secretarius.js", js, 'utf8'
-					fs.appendFileSync 'lib/client/secretarius.js', '\nrequire("secretarius");', 'utf8'
-					rm 'buildapp'
-					p = spawn 'node_modules/.bin/uglifyjs', ['lib/client/secretarius.js']
-					p.stderr.on 'data', (data) ->
-						process.stderr.write data.toString()
-					p.stdout.on 'data', (data) ->
-						fs.appendFileSync 'lib/client/secretarius.min.js', do data.toString, 'utf8'
-					]
-###
+f _
+fs.remove "#{__dirname}/lib/app", _ unless argv.watch

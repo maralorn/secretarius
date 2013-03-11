@@ -4,7 +4,7 @@ exports.WindowSlot = class WindowSlot extends ui.Slot
 	constructor: (_, viewname) ->
 		console.log 'a'
 		model.inbox.get _
-		console.log 'a'
+		console.log 'b'
 		menu = ['','inbox', 'projects']
 		labels = {}
 		for dish in menu

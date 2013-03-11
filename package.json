@@ -7,9 +7,8 @@
   "devDependencies": {
 	"coffee-script":"",
 	"jade":">=0.27.6",
-	"stitch":">=0.3.3",
 	"less":">=1.3.0",
-	"uglify-js":">=1.3.3",
+	"uglify-js":"~2.2.0",
 	"browserify":"",
 	"fs-extra":"",
 	"glob": ""
