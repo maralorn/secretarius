@@ -23,11 +23,11 @@ module.exports = (connectionString) ->
 			{client: @client, done: @done} = getClient _
 			@client.query 'begin', _
 
-		commit: (_) =>
+		commit: (_) ->
 			@client.query 'commit', _
 			do @done
 
-		rollback: (_) =>
+		rollback: (_) ->
 			@client.query 'rollback', _
 			do @done
 
@@ -36,7 +36,7 @@ module.exports = (connectionString) ->
 			@client.query(config, _).rows
 		
 		queryOne: (_, config) ->
-			@queryMany _, config
+			res = @queryMany _, config
 			throw new Error 'queryOne got no result' unless res[0]?
 			res[0]
 	
@@ -52,7 +52,7 @@ module.exports = (connectionString) ->
 #	expect
 	query = (_, config) ->
 			transaction = config.transaction
-			if transaction? then t = transaction else t = new Transaction _
+			t = if transaction? then transaction else new Transaction _
 			try
 				if config.before?
 					config.before.call this, _, config, t
@@ -60,7 +60,7 @@ module.exports = (connectionString) ->
 					text: config.text
 					values: if config.values? then config.values else []
 				if config.after?
-					result config.after.call this, _, res, t
+					result = config.after.call this, _, res, t
 					res = result if result?
 				t.commit _ unless transaction?
 			catch error
@@ -466,8 +466,8 @@ module.exports = (connectionString) ->
 				after: (_, res) -> res[0]?.id
 
 		get: (_, t) ->
-			size = @getSize _, t
-			first = @getFirst _, t
+			size = @getSize null, t
+			first = @getFirst null, t
 			{size: size(_), first: first(_)}
 	###
 	

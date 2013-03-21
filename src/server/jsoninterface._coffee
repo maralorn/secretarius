@@ -23,7 +23,7 @@ module.exports = (app, model) ->
 			if type in ['inbox', 'urgent', 'maybe']
 				model[type]
 			else if cls?
-				if model.UUID_REG.test id
+				if util.UUID_REG.test id
 					new cls id
 				else if req.method == "POST"
 					new cls
@@ -46,17 +46,12 @@ module.exports = (app, model) ->
 			((_) =>
 				try
 					object = @findObject req
-					return do next if object is null
 					method = @findMethod req, object
-					handler = null
-					for handlerobj in @methods
-						if handlerobj.method is method
-							handler = handlerobj
-					return do next unless handler?
-					if handler.before?
-						args = handler.before(_, req) or []
+					handler = handlerobj for handlerobj in @methods when handlerobj.method is method
+					return do next unless handler? and method? and object?
+					args = if handler.before? then handler.before(_, req) else []
 					try
-						((cb) -> method.apply object, [cb].concat args) _
+						result = method.apply_ _, object, args, 0
 					catch error
 						if handler.catcher?
 							handler.catcher error
@@ -66,10 +61,10 @@ module.exports = (app, model) ->
 						result = handler.after _, result
 					res.json 200, if result? then result else {msg: "success"}
 				catch error
-					res.json code,
+					console.log error.stack
+					res.json 500,
 						msg: "Internal Error"
-						error: error
-					util.debug error)(->)
+						error: if util.debugOn then error else 'hidden') util.dummyCB
 			
 	parser = new Parser
 

@@ -1,0 +1,191 @@
+!!! 5
+html
+	head
+		meta(charset='utf-8')
+		link(rel='stylesheet', type='text/css', href='style.css')
+		script(src='secretarius.js', type='text/javascript')
+		script#asap(type='text/html')
+			.asap.task
+				| To Do:&nbsp; 
+				span.description
+				| &nbsp;List:&nbsp; 
+				span.list
+				span(style='float:right;')
+					input(name='completed', type='checkbox')
+					button(name='delete') X
+
+		script#asap(type='text/html')
+			form
+				input(name='asap')
+				| List:
+				span.listsel
+				| Project:
+				span.projectsel
+				button Create ToDo
+
+		script#asap(type='text/html')
+			button(name='toggleshow') Show all
+			table
+				thead
+					tr
+						th Done
+						th Description
+						th Project
+						th Deadline
+						th References
+						th Last Changed
+						th Created At
+						th Delay
+						th Move To
+						th Delete
+				tbody
+			.newtodo
+			form
+				input(name='newname')
+				button Rename
+
+		script#asap(type='text/html')
+			h2 New ToDo List
+			form(name='list')
+				input(name='list')
+				button(type='submit') New ToDo List
+
+		script#asap(type='text/html')
+
+		script#asap(type='text/html')
+
+		script#asap(type='text/html')
+			h1
+			.inboxinfo
+			.front
+				button(name='asap') New ToDo
+				button(name='project') New Project
+			.back
+				button Cancel
+				.newproject
+				.newasap
+		script#asap(type='text/html')
+			span
+				span.label
+				button x
+		script#asap(type='text/html')
+			.infocontent
+			button(name='save') Save
+			.options
+				.setStatus
+					button(name='delete') Delete
+					button(name='default') Normal
+					button(name='maybe') Maybe
+					button(name='inbox') Inbox
+					button(name='urgent') Urgent
+				.delay
+				.times
+					| Last Change:
+					span.reltime.last_edited
+					| Created:
+					span.reltime.created_at
+				.references
+					h2 References
+				.attachments
+					h2 Attachments
+					.upload
+			button(name='options') Toggle Options
+		script#asap(type='text/html')
+			span infolabel
+		script#asap(type='text/html')
+			tr
+				td
+					input(type='checkbox')
+				td.desc
+					span
+					form
+						input(type='text')
+						button Rename
+				td.project
+				td.deadline
+				td.refs
+				td.last.reltime
+				td.create.reltime
+				td.delay
+				td.listsel
+				td
+					button(name='delete') Delete
+		script#asap(type='text/html')
+			.newnote
+			h2 ToDo Lists
+			.lists
+			.newlist
+		script#asap(type='text/html')
+			span msg
+		script#asap(type='text/html')
+			form
+				textarea(placeholder='Note is empty…')
+		script#asap(type='text/html')
+			h2 New Note
+			form(name='note')
+				input(name='note')
+				button(type='submit') New Note
+		script#asap(type='text/html')
+			.project.task
+				.projecthandle
+					button.collapse
+					form
+						span.name
+						input(type='text')
+						button Rename
+					span(style='float:right;')
+						input(name='completed', type='checkbox')
+						button(name='delete') X
+				.children
+		script#asap(type='text/html')
+			form
+				input(name='project')
+				| Parent:
+				span.parentpicker
+				button Create Project
+		script#asap(type='text/html')
+			button(name='toggleshow') Show all
+			.tasklist
+			.root /
+		script#asap(type='text/html')
+			.front
+				button Set
+				span 
+					span.reltime
+					button Change
+			.back
+				form
+					input(name='day', size=2)
+					| .
+					input(name='month', size=2)
+					| .
+					input(name='year', size=4)
+					| &nbsp;&nbsp;&nbsp;
+					input(name='hour', size=2)
+					|:
+					input(name='minute', size=2)
+					|:
+					input(name='second', size=2)
+				button Abort
+				button(name='delete') Delete
+				button(name='save') Save
+		script#asap(type='text/html')
+			button Upload new
+			form
+				input(type="file")
+				button Cancel
+				button Upload
+
+	body
+		div(data-bind='foreach: msg')
+			p(data-bind='text: $data')
+		#header
+			h1 Secretarius
+			#clock(data-bind='text: clock')
+			#menu
+				button entry
+		#content
+		#footer
+			p
+				| Secretarius
+				a(href='https://github.com/maralorn/secretarius') Help, Documentation, Bugs
