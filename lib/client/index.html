@@ -182,21 +182,23 @@
         <button>Upload</button>
       </form>
     </script>
+    <script id="slot" type="text/html">
+      <div data-bind="if: used, with: view">
+        <h1 data-bind="text: title"></h1>
+        <div data-bind="template: template"></div>
+      </div>
+    </script>
   </head>
   <body>
     <div data-bind="foreach: msg">
       <p data-bind="text: $data"></p>
     </div>
-    <div id="header">
-      <h1>Secretarius</h1>
-      <div id="clock" data-bind="text: clock"></div>
-      <div id="menu">
-        <button>entry</button>
-      </div>
-    </div>
-    <div id="content"></div>
+    <div data-bind="text: clock"></div>
+    <div data-bind="foreach: menu"><a data-bind="attr: { href: url }, text: label"></a></div>
+    <div data-bind="foreach: asaplists.list"><a data-bind="attr: { href: url }, text: label"></a></div>
+    <div data-bind="template: &quot;slot&quot;"></div>
     <div id="footer">
-      <p>Secretarius<a href="https://github.com/maralorn/secretarius">Help, Documentation, Bugs</a></p>
+      <p>Secretarius <a href="https://github.com/maralorn/secretarius">Help, Documentation, Bugs</a></p>
     </div>
   </body>
 </html>

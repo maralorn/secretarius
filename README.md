@@ -20,8 +20,5 @@ Acknowledgments
 This project uses
 
 jquery
-streamline-require (MIT)
 date.extensions
 jquery.autosize-min
-jade
-favicon

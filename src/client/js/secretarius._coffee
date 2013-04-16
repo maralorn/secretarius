@@ -6,7 +6,6 @@ sec = require 'libsecretarius'
 util = sec.util
 model = sec()
 
-
 defaultTo = (obj, defaults) ->
 	for key, value of defaults
 		obj[key] = value unless obj[key]?
@@ -34,19 +33,40 @@ label = (_, viewname) ->
 	View.getLabel _, viewname
 
 class ViewModel
-	constructor: (_) ->
-		@_connections = []
+	constructor: ->
+		@__connections = []
+		@__elements = []
+		@__stopped = false
 		
-	connect: (_, obj, event, callback) ->
-		cb = (data) -> ((_) =>
+	connect: (obj, event, callback) ->
+		cb = (data) => ((_) =>
 			callback _, data) util.dummyCB
 		cb.event = event
 		cb.obj = obj
-		@_connections.push cb
+		@__connections.push cb
 		obj.on event, cb
-			
+
+	stop: ->
+		@__stopped = true
+		for cb in @__connections
+			cb.obj.removeCB cb.event, cb
+		for elem in @__elements
+			do elem.stop
+		@__elements = []
+	
+	add: (elem) ->
+		@__elements.push elem
+
+	delete: (elem) ->
+		@__elements = (e for e in @__elements when elem isnt e)
+		do elem.stop
+
+	poll: (func, interval = 1000) ->
+		(clock = =>
+			setTimeout (=> clock util.dummyCB unless @__stopped), interval - (new Date().getTime() % interval)
+			do func) util.dummyCB
 		
-class View
+class View extends ViewModel
 	_views = []
 
 	@registerView: (regex, cls, label) ->
@@ -75,6 +95,82 @@ class View
 	@test: (viewname) ->
 		@_find(viewname)[0]?
 
+class Slot extends ViewModel
+	constructor: ->
+		super
+		@used = ko.observable false
+
+	setView: (viewname) ->
+		if View.test viewname
+			do @clear
+			@view = View.create viewname, this
+			@used true
+
+	clear: ->
+		@used false
+		do @view?.stop
+
+class SlotGenerator
+	_default = null
+	@setDefault: (generator) ->
+		_default = generator
+	@getDefault: ->
+		_default
+
+class WindowSlotGenerator extends SlotGenerator
+	show: (_, viewname) ->
+		win.setView _, viewname
+
+	@setDefault new this
+
+class NewWindowSlotGenerator extends SlotGenerator
+	show: (viewname) ->
+		window.open "#{window.location.origin}##{viewname}", '', 'toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=no,copyhistory=no'
+
+class WindowSlot extends Slot
+
+	menu = [ '', 'inbox', 'projects' ]
+
+	constructor: ->
+		super
+		@msg = ko.observableArray()
+		@menu = ko.observableArray()
+		((_) => for viewname in menu
+			@menu.push
+				url: viewname
+				label: label _, viewname) util.dummyCB
+		@clock = ko.observable ''
+		@poll (_) -> @clock "#{new Date().toLocaleString()} Inbox:#{model.inbox.getSize _}"
+
+	setView: (_, viewname) ->
+		super _, window.location.hash = viewname
+
+	showMessage: (_, msg, timeout = 5000) ->
+		@msg.push msg
+		setTimeout (=> do @msg.shift), timeout
+
+class ListManager extends ViewModel
+	constructor: (@creator) ->
+		@list = ko.observableArray()
+		
+	setList: (_, list) =>
+		ids = (item.id for item in @list())
+		for id in list when not id in ids
+			@list.push (newelem = @creator _, id)
+			@add newelem
+		@list.remove (item) =>
+			@delete item unless (del = item.id in list)
+			del
+
+		@list.sort (lhs, rhs) ->
+			diff = list.indexOf(rhs.id) - list.indexOf(lhs.id)
+			if diff < 0
+				-1
+			else if diff > 0
+				1
+			else
+				0
+	'''
 class DropArea
 	constructor: (contentNode, cb) ->
 		contentNode.bind 'dragover', (ev) -> do ev.originalEvent.preventDefault
@@ -82,35 +178,7 @@ class DropArea
 			do ev.originalEvent.preventDefault
 			cb ev.originalEvent.dataTransfer.getData 'text/plain'
 
-Slot = class Slot
-	constructor: (@contentNode, @titleNode) ->
-		@emitter = new Emitter do @getTitleNode
-		do @clear
-
-	setView: (viewname) =>
-		if View.test viewname
-			do @clear
-			@view = View.create viewname, this
-			@emitter.setViewName viewname
-
-	setTitle: (title) ->
-		@getTitleNode().html title
-		
-	setContent: (html) ->
-		@getContentNode().html html
-
-	getContentNode: ->
-		@contentNode
-
-	getTitleNode: ->
-		@titleNode
-
-	clear: =>
-		do @view?.delete
-		do @getContentNode().empty
-		@setTitle 'Secretarius'
-
-exports.Emitter = class Emitter
+class Emitter
 	constructor: (@node, @slotGenerator) ->
 		@slotGenerator ?= do SlotGenerator.getDefault
 		@node.attr 'draggable', 'true'
@@ -124,32 +192,8 @@ exports.Emitter = class Emitter
 
 	getViewName: ->
 		@viewName
-		
-exports.SlotGenerator = class SlotGenerator
-	_default = null
-	@setDefault: (generator) ->
-		_default = generator
-	@getDefault: ->
-		_default
+'''
 
-class WindowSlotGenerator extends SlotGenerator
-	show: (viewname) ->
-		win.setView window.location.hash = viewname
-		
-	@setDefault new this
-
-class NewWindowSlotGenerator extends SlotGenerator
-	show: (viewname) ->
-		window.open "#{window.location.origin}##{viewname}", '', 'toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=no,copyhistory=no'
-
-class WindowSlot extends Slot
-	constructor: (_) ->
-		@msg = ko.observableArray()
-		@clock = ko.observable ''
-		do clock = (_) =>
-			setTimeout (=> clock util.dummyCB), 1000 - (new Date().getTime() % 1000)
-			@clock "#{new Date().toLocaleString()} Inbox:#{model.inbox.getSize _}"
-		
 	###		
 		menu = ['','inbox', 'projects']
 		labels = {}
@@ -177,11 +221,6 @@ class WindowSlot extends Slot
 		super $('#content'), do $('#header > h1').first
 		WindowSlot.__super__.setView.call this, viewname
 		new DropArea do $('#header > h1').first, @setView
-###
-	showMessage: (_, msg, timeout = 5000) ->
-		@msg.push msg
-		setTimeout (=> do @msg.shift), timeout
-###		
 		
 	setTitle: (title) ->
 		super
@@ -327,23 +366,6 @@ exports.TimePicker = class TimePicker
 	getDate: =>
 		@date
 
-ListManager = class ListManager
-	constructor: (_, @creator) ->
-		@array = ko.observableArray()
-		
-	setList: (_, list) =>
-		ids = (item.id for item in @array())
-		for id in list when id not in ids
-			@array.push @creator _, id
-		@array.remove (item) -> not item.id in list
-		@array.sort (lhs, rhs) ->
-			diff = list.indexOf(rhs.id) - list.indexOf(lhs.id)
-			if diff < 0
-				-1
-			else if diff > 0
-				1
-			else
-				0
 
 
 exports.InfoListManager = class InfoListManager extends ListManager
@@ -848,18 +870,10 @@ class InboxView extends View
 	
 	delete: ->
 
-win = new WindowSlot _
-#win.setView document.location.hash
+info =  model.cache.getInformation _, '4dd53cb0-8bc1-11e2-ae7d-8c705ab2d594'
+for key, value of info
+	console.log "#{key}:#{value}"
+win = new WindowSlot
+win.setView document.location.hash
 $ ->
 	ko.applyBindings win
-
-win.showMessage _, 'Hallo'
-setTimeout _, 1000
-win.showMessage _, 'Du'
-setTimeout _, 1000
-win.showMessage _, 'Bist'
-setTimeout _, 1000
-win.showMessage _, 'Aber'
-setTimeout _, 1000
-win.showMessage _, 'Komisch'
-

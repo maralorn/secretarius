@@ -22,7 +22,7 @@
 	"libsecretarius":""
   },
   "scripts": {
-	  "prepublish": "_coffee build._coffee"
+	  "prepublish": "_coffee build._coffee -f"
   },
   "keywords": [],
   "repository": "git://github.com/maralorn/secretarius"

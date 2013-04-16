@@ -176,16 +176,21 @@ html
 				button Cancel
 				button Upload
 
+		script#slot(type='text/html')
+			div(data-bind='if: used, with: view')
+				h1(data-bind='text: title')
+				div(data-bind='template: template')
+
 	body
 		div(data-bind='foreach: msg')
 			p(data-bind='text: $data')
-		#header
-			h1 Secretarius
-			#clock(data-bind='text: clock')
-			#menu
-				button entry
-		#content
+		div(data-bind='text: clock')
+		div(data-bind='foreach: menu')
+			a(data-bind='attr: { href: url }, text: label')
+		div(data-bind='foreach: asaplists.list')
+			a(data-bind='attr: { href: url }, text: label')
+		div(data-bind='template: "slot"')
 		#footer
 			p
-				| Secretarius
+				| Secretarius 
 				a(href='https://github.com/maralorn/secretarius') Help, Documentation, Bugs
