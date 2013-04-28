@@ -176,6 +176,19 @@
         <button>Upload</button>
       </form>
     </script>
+    <script id="selector" type="text/html">
+      <!-- ko with: selector--><a href="" data-bind="click: toggle.bind(delayed), css: {active: delayed}" title="Hide not yet active tasks">&nbsp;<i class="icon-time"></i>&nbsp;</a><a href="" data-bind="click: toggle.bind(blocked), css: {active: blocked}" title="Hide tasks blocked by dependency">&nbsp;<i class="icon-lock"></i>&nbsp;</a><a href="" data-bind="click: toggle.bind(completed), css: {active: completed}" title="Hide completed tasks">&nbsp;<i class="icon-check"></i>&nbsp;</a>
+      <!-- /ko-->
+    </script>
+    <script id="asaplistview" type="text/html">
+      <h1 data-bind="text: info.name"></h1>
+      <!-- ko template: 'selector'-->
+      <!-- /ko-->
+      <section data-bind="template: {name: 'slot', data: innerSlot}"></section>
+      <ul data-bind="slidingList: list">
+        <li><a href="" data-bind="text: description, click: $parent.setFocus"></a></li>
+      </ul>
+    </script>
     <script id="notereference" type="text/html">
       <!-- ko template: "noteview"-->
       <!-- /ko-->
@@ -193,8 +206,7 @@
       <ul data-bind="foreach: states">
         <li><a href="" data-bind="html: label, style: { color: active() ? 'white' : '' }, click: $parent.setStatus, attr: { title: tooltip}"></a></li>
       </ul>
-      <!-- ko template: type + 'view'-->
-      <!-- /ko-->
+      <div data-bind="template: type + 'view'"></div>
       <footer>
         <h3 data-bind="drop: addReference"> <i class="icon-hand-right"></i> References <a href="" data-bind="click: addNote"><i class="icon-file-alt"></i> Add Note</a></h3>
         <ul data-bind="slidingList: references">
@@ -213,7 +225,7 @@
     </script>
     <script id="slot" type="text/html">
       <!-- ko with: view-->
-      <h1><a data-bind="css: &quot;icon-&quot; + icon, emitter: $parent.viewname, drop: $parent.setView, attr: { title: title}"></a></h1>
+      <h1><a data-bind="emitter: $parent.viewname, drop: $parent.setView, attr: { title: title}"><i data-bind="css: &quot;icon-&quot; + icon"></i></a></h1>
       <article data-bind="template: template"></article>
       <!-- /ko-->
     </script>

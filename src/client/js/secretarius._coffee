@@ -129,11 +129,15 @@ class Slot
 	setView: (viewname) =>
 		if View.test viewname
 			@viewname viewname
-			((_) =>
-				@view View.create _, viewname, this) util.dummyCB
+			util.doAsync (_) =>
+				@view View.create _, viewname, this
 
 	clear: ->
 		@view null
+
+class SlaveSlot extends Slot
+	setView: (->)
+	forceView: (args...) -> Slot::setView.apply this, args
 
 class SlotGenerator
 	_default = null
@@ -180,7 +184,7 @@ class WindowSlot extends Slot
 		@asaplists = observableList store.getList(_, 'AsapList'), (_, id) -> {
 				url: "asaplist/#{id}"
 				label: store.getInfo(_, id).name }
-		inbox = store.getObject(_, 'inbox')
+		inbox = store.getObject _, 'inbox'
 		@clock = ko.computed -> "#{icon 'inbox'} #{inbox.size()}"
 
 	setView: (viewname) =>
@@ -544,13 +548,10 @@ class InboxView extends View
 		@template = 'inbox'
 		@title = ko.computed -> "Inbox (#{inbox.size()})"
 		@icon = 'inbox'
-		@innerSlot = new Slot _
-		setView = @innerSlot.setView
-		@innerSlot.setView = (->)
-		@full = ko.computed ->
-			util.UUID_REG.test inbox.first()
+		@innerSlot = new SlaveSlot _
+		@full = ko.computed -> inbox.size() > 0
 		update = (id, _) =>
-			setView id2viewname _, id
+			@innerSlot.forceView id2viewname _, id
 		inbox.first.subscribe update
 		update inbox.first()
 
@@ -562,8 +563,6 @@ class InfoView extends View
 		@template = 'info'
 		@icon = 'info-sign'
 		@init _
-#		@slot.setContent do require "./template/infoframe"
-#
 		@states = [{
 			state: 'delete'
 			label: '&#xf00d;'
@@ -610,11 +609,6 @@ class InfoView extends View
 		@info.model.setStatus util.dummyCB, menuElement.state
 
 # 		Delay??
-#
-# 		Refererences
-#
-# 		TimeStamps
-#
 			
 class Reference
 	constructor: (_, @id) ->
@@ -641,17 +635,15 @@ class NoteView extends InfoView
 		
 	
 	saveContent: ->
-		((_) =>
+		util.doAsync (_) =>
 			save = win.showMessage "Saving …"
 			@info.model.setContent _, @content()
 			setTimeout _, 1000
 			save 'Save successful!'
-		) util.dummyCB
 
 class references.note extends Reference
 	init: NoteView::init
 	saveContent: NoteView::saveContent
-
 
 ###
 	initContent: ->
@@ -672,22 +664,43 @@ class references.note extends Reference
 				msg.html 'Save failed!'
 			else
 				msg.html 'Saved!'
+###
+
+class TaskSelector
+	constructor: ->
+		@delayed = ko.observable true
+		@completed = ko.observable false
+		@blocked = ko.observable true
+
+	toggle: -> this not this()
 
 class AsapListView extends InfoView
-	@registerView /^asaplist:(.*)$/, this, (_, match) ->
-		"ToDo List: #{model.cache.getInformation(_, match[1]).name}"
+	@registerView /^asaplist\/(.*)$/, this, (_, match) -> "ToDo List: #{model.cache.getInformation(_, match[1]).name}"
 
-	drawTitle: ->
-		@slot.setTitle @info.name
+	init: (_) ->
+		util.doAsync (_) -> model.Asap.getAllIDs _
+			# Preload all Asaps, this shouldn't be to big a memory hit but page load is significantly faster.
+		@selector = new TaskSelector
+		@icon = 'tasks'
+		@title = @info.name
+		@focus = ko.observable false
+		@innerSlot = new SlaveSlot _
+			
+		unfilteredList = observableList @info.asaps, (_, id) =>
+			asap = store.getInfo _, id
+			{
+				id: asap.id()
+				visible: ko.computed =>
+					(not asap.completed()? or @selector.completed()) and (asap.active() or asap.delayed())
+				description: asap.description}
 
-	drawContent: (_) ->
-		@newname.val @info.name
-		model.Asap.getAllIDs _
-		@list.setList @info.asaps
+		@list = ko.computed -> (asap for asap in unfilteredList() when asap.visible())
 
-	initContent: ->
-#		@contentNode.html do require './template/asaplist'
-		@contentNode.addClass 'hideinactive'
+	setFocus: (data) =>
+		util.doAsync (_) =>
+			@innerSlot.forceView id2viewname _, data.id
+			
+###
 		active = true
 		togglebutton = $('button[name=toggleshow]')
 		togglebutton.click =>
@@ -860,11 +873,11 @@ class ProjectView extends TaskView
 		@slot.setTitle "Project: #{@info.description}"
 ###
 class AsapView extends InfoView
-	@registerView /^asap\/(.*)$/, this, (_, match) ->
-		"ToDo: #{model.cache.getInformation(_, match[1]).description}"
+	@registerView /^asap\/(.*)$/, this, (_, match) ->	"ToDo: #{model.cache.getInformation(_, match[1]).description}"
 
 	init: (_) ->
 		@title = @info.description
+		@icon = 'check'
 ###
 class ProjectsView extends View
 	@registerView /^projects$/, this, (_) -> 'Projects'
@@ -905,7 +918,7 @@ class ProjectsView extends View
 
 ###
 class MainView extends View
-	@registerView /^$/, this, (_) -> '&#xf040;'
+	@registerView /^$/, this, (_) -> icon 'pencil'
 
 	constructor: (_, @slot) ->
 		@title = 'Secretarius'
@@ -966,13 +979,30 @@ ko.bindingHandlers.drag =
 			ev.originalEvent.dataTransfer.setData 'text/plain', ko.utils.unwrapObservable valueAccessor()
 			ev.originalEvent.dataTransfer.setData 'text/uri-list', "#{window.location.origin}/##{ko.utils.unwrapObservable valueAccessor()}"
 
+ko.virtualElements.allowedBindings.fadeVisible = true
+
 ko.bindingHandlers.fadeVisible =
-	init: (element, valueAccessor) ->
-		value = valueAccessor()
-		$(element).toggle ko.utils.unwrapObservable value
-	update: (element, valueAccessor) ->
-		value = valueAccessor()
-		if ko.utils.unwrapObservable(value) then $(element).fadeIn() else $(element).fadeOut()
+	init: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
+		child = ko.virtualElements.firstChild element
+		while child?
+			if child.nodeType is 1
+				$(child).toggle ko.utils.unwrapObservable valueAccessor()
+			child = ko.virtualElements.nextSibling child
+
+	update: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
+		unless (show = ko.utils.unwrapObservable valueAccessor())
+			child = ko.virtualElements.firstChild element
+			while child?
+				if child.nodeType is 1
+					$(child).fadeOut 500
+				child = ko.virtualElements.nextSibling child
+		if show
+			child = ko.virtualElements.firstChild element
+			while child?
+				if child.nodeType is 1
+					$(child).fadeOut 0
+					$(child).fadeIn 500
+				child = ko.virtualElements.nextSibling child
 
 ko.bindingHandlers.autosize =
 	init: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->

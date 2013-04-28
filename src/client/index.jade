@@ -178,6 +178,33 @@ html
 				button Upload
 
 
+
+
+		script#selector(type='text/html')
+			// ko with: selector
+			a(href='', data-bind='click: toggle.bind(delayed), css: {active: delayed}', title='Hide not yet active tasks')
+				| &nbsp;
+				i.icon-time
+				| &nbsp;
+			a(href='', data-bind='click: toggle.bind(blocked), css: {active: blocked}', title='Hide tasks blocked by dependency')
+				| &nbsp;
+				i.icon-lock
+				| &nbsp;
+			a(href='', data-bind='click: toggle.bind(completed), css: {active: completed}', title='Hide completed tasks')
+				| &nbsp;
+				i.icon-check
+				| &nbsp;
+			// /ko
+
+		script#asaplistview(type='text/html')
+			h1(data-bind='text: info.name')
+			// ko template: 'selector'
+			// /ko
+			section(data-bind="template: {name: 'slot', data: innerSlot}")
+			ul(data-bind='slidingList: list')
+				li
+					a(href='', data-bind='text: description, click: $parent.setFocus')
+
 		script#notereference(type='text/html')
 			// ko template: "noteview"
 			// /ko
@@ -198,8 +225,7 @@ html
 				li
 					a(href='', data-bind="html: label, style: { color: active() ? 'white' : '' }, click: $parent.setStatus, attr: { title: tooltip}")
 
-			// ko template: type + 'view'
-			// /ko
+			div(data-bind="template: type + 'view'")
 			footer
 				h3(data-bind='drop: addReference') 
 					i.icon-hand-right
@@ -227,7 +253,8 @@ html
 		script#slot(type='text/html')
 			// ko with: view
 			h1
-				a(data-bind='css: "icon-" + icon, emitter: $parent.viewname, drop: $parent.setView, attr: { title: title}')
+				a(data-bind='emitter: $parent.viewname, drop: $parent.setView, attr: { title: title}')
+					i(data-bind='css: "icon-" + icon')
 			article(data-bind='template: template')
 			// /ko
 
