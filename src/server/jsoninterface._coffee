@@ -71,7 +71,7 @@ module.exports = (app, model) ->
 	afterOnPost = (_, ans) -> id: ans
 
 	pgCode = (code) ->
-		(error) -> throw error unless error.code? and error.pgerror.code is code
+		(error) -> throw error unless error.pgerror? and error.pgerror.code is code
 
 	parser.registerMethods
 		after: (_, ans) -> type: ans
@@ -94,7 +94,7 @@ module.exports = (app, model) ->
 
 		method: model.Information.getAll,
 
-			before: con = (_, req) -> [req.body.content]
+			before: con = (_, req) -> [req.body.content, req.body.status]
 			after: afterOnPost
 			method: model.Note::create,
 

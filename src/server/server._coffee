@@ -29,8 +29,8 @@ app.use (req, res, next) ->
 	do next
 
 app.use express.compress()
-app.use express.cookieParser()
-app.use express.cookieSession secret: "secret-#{Math.random()}"
+#app.use express.cookieParser()
+#app.use express.cookieSession secret: "secret-#{Math.random()}"
 app.use express.static path.normalize "#{__dirname}/../client"
 app.use express.bodyParser()
 
@@ -50,4 +50,4 @@ app.use (req, res) ->
 		json: -> res.json 404, obj
 		html: ->	res.send 404, '<html><body><h1>404 - Not Found</h1></body></html>'
 
-http.createServer(app).listen 3000
+http.createServer(app).listen 3001

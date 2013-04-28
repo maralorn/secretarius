@@ -1,9 +1,17 @@
-@bg1: #9999ee;
-@fg1: #00000f;
-@bg2: #000044;
+@import "font-awesome.css";
+// 4A93FF 5A83BF 1851A6 78AEFF 9CC4FF
+@bg1: #9CC4FF;
+@fg1: #000000;
+@fg1a: #1851A6;
+@bg2: #4A93FF;
+@bg2a: #5A83BF;
 @fg2: #ffffff;
-@bg3: #00000f;
-@fg3: #9999ff;
+@fg2a: @bg3;
+@bg3: #1851A6;
+@bg3a: #FFFFFF;
+@fg3: #9CC4FF;
+@fg3a: #000000;
+@inactive: #b0b0b0;
 .color1 {
 	color: @fg1;
 	background: @bg1;
@@ -41,8 +49,183 @@
 	src: url('Clockopia.ttf');
 }
 
-@font: Monaco, Fixed, monospace;
-@fontsize: 8pt;
+@font: FontAwesome, baar_sophia, Monaco, Fixed, monospace;
+@fontsize: 10pt;
+
+
+body{
+	.color3i;
+	width: 60em;
+	max-width: 100%;
+	margin: 0 auto;
+	a {
+		.color3i;
+		text-decoration: none;
+		transition-property: color;
+		transition-duration: 0.5s;
+		&:hover {
+			color: @bg3a;
+		}
+	}
+	> ul {
+		> li {
+			float: left;
+			ul {
+				position:absolute;
+				a {
+					.color3;
+					&:hover {
+						color: @fg3a;
+					}
+				}
+			}
+		}
+		li {
+			list-style: none;
+			a {
+				padding: 0.3em;
+				display: block;
+			}
+		}
+	}
+	> header {
+		float: right;
+		display: block;
+		padding: 0.3em;
+	}
+	> div {
+		overflow: auto;
+		a:hover {
+			color: @fg2a;
+		}
+		.color2;
+		clear: both;
+		h1 {
+			padding: 0.5em;
+			margin-right: 1em;
+			float: left;
+			a {
+				font-size: 1.5*@fontsize;
+				.color2;
+			}
+		}
+		> article {
+			padding: 0.5em;
+			span {
+				text-align: right;
+			}
+			li {
+				display: inline;
+				list-style: none;
+				a {
+					background: @bg2;
+					color: @inactive;
+					font-size: 0.8 * @fontsize;
+				}
+			}
+			h3 {
+				margin-bottom: 1em;
+				a {
+					font-size: @fontsize;
+					.color2;
+					color: @bg1;
+				}
+			}
+			h1 {
+				padding: 0em;
+				padding-bottom: 0.1em;
+				margin-bottom: 0em;
+				a {
+					font-size: 1.5*@fontsize;
+					.color2;
+				}
+			}
+			form {
+				a {
+					.color2;
+				}
+				textarea {
+					border: 0px;
+					padding: 0px;
+					margin: 0px;
+					.color2;
+					outline: none;
+					resize: none;
+					width: 100%;
+					overflow: hidden;
+					vertical-align: top;
+					transition-property: background-color, height;
+					transition-duration: 0.5s;
+					font-size: @fontsize; font-family: @font;
+				}
+			}
+			footer {
+				* {
+					transition-property: background-color, color;
+					transition-duration: 0.5s;
+				}
+				.hover {
+					textarea, a {
+						background-color: @bg3;
+					}
+					background-color: @bg3;
+				}
+				li {
+					a {
+						color: @fg3;
+						&:hover{ 
+							color: @fg3a;
+						}
+					}
+					div {
+						width: 90%;
+						float: right;
+					}
+					display: block;
+					border-top: 1px solid @bg3;
+					overflow: auto;
+				}
+				p {
+					text-align: right;
+				}
+				margin-top: 0.3em;
+				font-size: 0.8 * @fontsize;
+				color: @bg1;
+				time {
+					font-size: 0.8 * @fontsize;
+				}
+			}
+		}
+		> ul > li {
+			padding: 0.5em;
+			text-align: center;
+			.color3;
+			margin-bottom: 0.3em;
+			a {
+				float: right;
+				display: block;
+				margin-right: 1em;
+				.color3;
+				&:hover {
+					color: @fg3a;
+				}
+			}
+		}
+	}
+	> footer {
+		padding: 0.3em;
+	}
+}
+
+
+
+
+
+
+@font-face {
+	font-family: baar_sophia;
+	src: url('Clockopia.ttf');
+}
 
 button {
 	border: 0.1em solid @bg3;
@@ -60,10 +243,6 @@ button:hover, .active{
 	.children {
 		border-left: 3px solid @fg3;
 	}
-}
-
-body{
-	.color3;
 }
 
 input, select, option{
@@ -100,39 +279,10 @@ td{
 	transition: all 0.5s ease;
 }
 
-h1{
-	padding: 0.5em;
-	margin-right: 0.5em;
-	margin-bottom: 0.2em;
-	font-size: 1.5*@fontsize;
-	.color3;
-	float: left;
-}
 
 table{ width: 100%; }
 td{ text-align: center; }
 
-#clock{
-	float: right;
-}
-#msgcontainer{
-	position: absolute;
-	top:0; left:0;
-	width: 100%;
-	text-align:center;
-	span {
-		display: inline-block;
-		text-align:center;
-		padding: 0.2em;
-		margin-top: 0.2em;
-		.color1;
-		border-radius: 0.3em;
-	}
-		
-}
-span.reltime {
-	padding: 0em 1.5em 0em 0.5em;
-}
 .attachments, .references, .times{
 	> h2 {
 		font-size: 1.3*@fontsize;
@@ -162,24 +312,3 @@ span.reltime {
 	display: inline-block;
 }
 
-textarea{
-	border:0px;
-	.color3;
-	outline: none;
-	resize: none;
-	width: 100%;
-	margin: 0.2em 0em;
-	padding: 0.5em;
-	overflow: hidden;
-	vertical-align: top;
-	-webkit-transition: height 0.5s;
-	font-size: @fontsize; font-family: @font;
-}
-#content, #header, #footer{
-	padding: 0.5em;
-	margin: 0.5em;
-	.color2;
-	clear:both;
-	overflow: auto;
-	-webkit-transition: height 0.2s;
-}

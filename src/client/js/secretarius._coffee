@@ -1,7 +1,8 @@
 require './vendor/jquery'
 require './vendor/jquery.autosize'
 require './vendor/date.extensions'
-ko = require './vendor/knockout'
+ko = require 'knockout'
+ko.mapping = require './vendor/knockout.mapping'
 sec = require 'libsecretarius'
 util = sec.util
 model = sec()
@@ -10,11 +11,14 @@ defaultTo = (obj, defaults) ->
 	for key, value of defaults
 		obj[key] = value unless obj[key]?
 
+viewname2id = (viewname) ->
+	/^\w*\/(.*)$/.exec(viewname)?[1]
+	
 id2viewname = (_, id) ->
 	info2viewname model.cache.getInformation _, id
 	
 viewname2info = (_, viewname) ->
-	if (id = /^\w*\/(.*)$/.exec(viewname)?[1])?
+	if (id = viewname2id viewname)?
 		model.cache.getInformation _, id
 	else
 		throw new Error "No Infoview Name: #{viewname}"
@@ -32,41 +36,63 @@ id2label = (_, id) ->
 label = (_, viewname) ->
 	View.getLabel _, viewname
 
-class ViewModel
+icon = (name) -> "<i class='icon-#{name}' />"
+
+class KOModelStorage
 	constructor: ->
-		@__connections = []
-		@__elements = []
-		@__stopped = false
-		
-	connect: (obj, event, callback) ->
-		cb = (data) => ((_) =>
-			callback _, data) util.dummyCB
-		cb.event = event
-		cb.obj = obj
-		@__connections.push cb
-		obj.on event, cb
-
-	stop: ->
-		@__stopped = true
-		for cb in @__connections
-			cb.obj.removeCB cb.event, cb
-		for elem in @__elements
-			do elem.stop
-		@__elements = []
+		@models = {}
 	
-	add: (elem) ->
-		@__elements.push elem
+	getInfo: (_, id) ->
+		unless id of @models
+			@models[id] = @createInfoModel _, model.cache.getInformation _, id
+		@models[id]
 
-	delete: (elem) ->
-		@__elements = (e for e in @__elements when elem isnt e)
-		do elem.stop
-
-	poll: (func, interval = 1000) ->
-		(clock = =>
-			setTimeout (=> clock util.dummyCB unless @__stopped), interval - (new Date().getTime() % interval)
-			do func) util.dummyCB
+	getList: (_, name) ->
+		unless name of @models
+			@models[name] = @createListModel _, model[name]
+		@models[name]
+	
+	getObject: (_, name) ->
+		unless name of @models
+			@models[name] = @createObjectModel _, model[name]
+		@models[name]
 		
-class View extends ViewModel
+	createObjectModel: util.singlify (_, obj) ->
+		koModel = ko.mapping.fromJS obj.get _
+		koModel.model = obj
+		obj.onChanged (data) ->
+			ko.mapping.fromJS data, koModel
+		koModel
+
+	createListModel: util.singlify (_, cls) ->
+		list = ko.observableArray cls.getAllIDs _
+		cls.onChanged list
+		list
+
+	createInfoModel: util.singlify (_, model) ->
+		koModel = ko.mapping.fromJS model
+		koModel.model = model
+		model.onChanged ->
+			ko.mapping.fromJS model, koModel
+		koModel
+
+store = new KOModelStorage
+
+observableList = (observedArray, creator) ->
+	elements = {}
+	list = ko.observableArray []
+	getElement = (_, id) ->
+		unless id of elements
+			elements[id] = creator _, id
+		elements[id]
+	observedArray.subscribe update = (arr, _) ->
+		for id of elements when not id in arr
+			delete elements[id]
+		list (getElement(_, id) for id in arr)
+	update observedArray(), util.dummyCB
+	list
+		
+class View
 	_views = []
 
 	@registerView: (regex, cls, label) ->
@@ -82,9 +108,9 @@ class View extends ViewModel
 		else
 			viewname
 
-	@create: (viewname, slot) ->
+	@create: (_, viewname, slot) ->
 		[row, params] = @_find viewname
-		new row.cls slot, params if row?
+		new row.cls _, slot, params if row?
 
 	@_find: (viewname) ->
 		for row in _views
@@ -95,20 +121,19 @@ class View extends ViewModel
 	@test: (viewname) ->
 		@_find(viewname)[0]?
 
-class Slot extends ViewModel
-	constructor: ->
-		super
-		@used = ko.observable false
+class Slot
+	constructor: (_) ->
+		@view = ko.observable null
+		@viewname = ko.observable()
 
-	setView: (viewname) ->
+	setView: (viewname) =>
 		if View.test viewname
-			do @clear
-			@view = View.create viewname, this
-			@used true
+			@viewname viewname
+			((_) =>
+				@view View.create _, viewname, this) util.dummyCB
 
 	clear: ->
-		@used false
-		do @view?.stop
+		@view null
 
 class SlotGenerator
 	_default = null
@@ -118,8 +143,8 @@ class SlotGenerator
 		_default
 
 class WindowSlotGenerator extends SlotGenerator
-	show: (_, viewname) ->
-		win.setView _, viewname
+	show: (viewname) ->
+		win.setView viewname
 
 	@setDefault new this
 
@@ -127,50 +152,56 @@ class NewWindowSlotGenerator extends SlotGenerator
 	show: (viewname) ->
 		window.open "#{window.location.origin}##{viewname}", '', 'toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=no,copyhistory=no'
 
+poll = (func, interval = 1000) ->
+	stopped = false
+	(clock = =>
+		setTimeout (=> clock util.dummyCB unless stopped), interval - (new Date().getTime() % interval)
+		do func) util.dummyCB
+	pollobj =
+		stop: -> stopped = true
+
+truncate = (str, length = 20) ->
+	if str.length > length-1
+		"#{str[0...length-2]}…"
+	else
+		str
+
 class WindowSlot extends Slot
 
-	menu = [ '', 'inbox', 'projects' ]
+	menu = ko.observableArray [ '', 'inbox', 'projects' ]
 
-	constructor: ->
+	constructor: (_) ->
 		super
 		@msg = ko.observableArray()
-		@menu = ko.observableArray()
-		((_) => for viewname in menu
-			@menu.push
+		@menu = observableList menu, (_, viewname) -> {
 				url: viewname
-				label: label _, viewname) util.dummyCB
-		@clock = ko.observable ''
-		@poll (_) -> @clock "#{new Date().toLocaleString()} Inbox:#{model.inbox.getSize _}"
+				label: label _, viewname }
+		@showlists = ko.observable false
+		@asaplists = observableList store.getList(_, 'AsapList'), (_, id) -> {
+				url: "asaplist/#{id}"
+				label: store.getInfo(_, id).name }
+		inbox = store.getObject(_, 'inbox')
+		@clock = ko.computed -> "#{icon 'inbox'} #{inbox.size()}"
 
-	setView: (_, viewname) ->
-		super _, window.location.hash = viewname
+	setView: (viewname) =>
+		if View.test viewname
+			super window.location.hash = viewname
 
-	showMessage: (_, msg, timeout = 5000) ->
-		@msg.push msg
-		setTimeout (=> do @msg.shift), timeout
+	showMessage: (msg, timeout = 5000) ->
+		@msg.push obs = ko.observable msg
+		if timeout > 0
+			setTimeout (=> do @msg.shift), timeout
+		obs
 
-class ListManager extends ViewModel
-	constructor: (@creator) ->
-		@list = ko.observableArray()
-		
-	setList: (_, list) =>
-		ids = (item.id for item in @list())
-		for id in list when not id in ids
-			@list.push (newelem = @creator _, id)
-			@add newelem
-		@list.remove (item) =>
-			@delete item unless (del = item.id in list)
-			del
+	deleteMsg: (msg) =>
+		@msg.remove (elem) ->
+			elem() is msg
+			
+	relTime: (time) ->
+		new Date(time).toRelativeTime
+			nowThreshold: 1000
 
-		@list.sort (lhs, rhs) ->
-			diff = list.indexOf(rhs.id) - list.indexOf(lhs.id)
-			if diff < 0
-				-1
-			else if diff > 0
-				1
-			else
-				0
-	'''
+###		
 class DropArea
 	constructor: (contentNode, cb) ->
 		contentNode.bind 'dragover', (ev) -> do ev.originalEvent.preventDefault
@@ -192,9 +223,6 @@ class Emitter
 
 	getViewName: ->
 		@viewName
-'''
-
-	###		
 		menu = ['','inbox', 'projects']
 		labels = {}
 		for dish in menu
@@ -273,7 +301,6 @@ exports.TabViewSlot = class TabViewSlot extends Slot
 
 	getHeader: ->
 		@title.parent()
-###
 
 exports.Flippable = class Flippable
 	constructor: (@front, @back) ->
@@ -508,108 +535,125 @@ exports.ProjectCreator = class ProjectCreator
 	setParent: (@parent) ->
 	setReference: (@reference) ->
 		
-	
+###
 class InboxView extends View
-	@registerView /^inbox$/, this, (_) -> 'Inbox'
+	@registerView /^inbox$/, this, (_) -> icon 'inbox'
 
 	constructor: (_, @slot) ->
-		@size = @first = null
-		@context = @slot.getContentNode()
-#		@slot.setContent do require "./template/inbox"
-		@innerslot = new Slot do $('.inboxinfo', do @slot.getContentNode).first, do $('h1', do @slot.getContentNode).first
-		model.inbox.onChanged @draw
-		model.inbox.get (err, values) => unless err? then @draw values
-		innerFlip = new Flippable $('.newasap', @context), $('.newproject', @context), 0
-		outerFlip = new Flippable $('.front', @context), $('.back', @context), 500
-		outerFlip.addToggler $('.front > button', @context)
-		outerFlip.addToggler $('.back > button', @context)
-		$('button[name=asap]', @context).click innerFlip.showFront
-		$('button[name=project]', @context).click innerFlip.showBack
-		@asapCreator = new AsapCreator $('.newasap', @context)
-		@projectCreator = new ProjectCreator $('.newproject', @context)
-
-	delete: ->
-		model.inbox.removeCb 'changed', @draw
-
-	draw: (values) =>
-		unless @size is values.size
-			@slot.setTitle "Inbox (#{@size = values.size})"
-		unless @first is values.first
-			@first = values.first
-			@asapCreator.setReference @first
-			@projectCreator.setReference @first
-			if @first?
-				@innerslot.setView "#{@first.type}:#{@first.id}"
-			else
-				do @innerslot.clear
+		inbox = store.getObject _, 'inbox'
+		@template = 'inbox'
+		@title = ko.computed -> "Inbox (#{inbox.size()})"
+		@icon = 'inbox'
+		@innerSlot = new Slot _
+		setView = @innerSlot.setView
+		@innerSlot.setView = (->)
+		@full = ko.computed ->
+			util.UUID_REG.test inbox.first()
+		update = (id, _) =>
+			setView id2viewname _, id
+		inbox.first.subscribe update
+		update inbox.first()
 
 class InfoView extends View
 	constructor: (_, @slot, match) ->
-		@context = do @slot.getContentNode
 		@id = match[1]
+		@info = store.getInfo _, @id
+		@type = @info.model.type
+		@template = 'info'
+		@icon = 'info-sign'
+		@init _
 #		@slot.setContent do require "./template/infoframe"
-		@contentNode = $('.infocontent', @context)
-		@info = model.cache.getInformation _, @id
-		@info.onChanged @draw
-		@info.onDeleted @delcb = => do @slot.setView ''
-		info = @info
-		$(".setStatus > button", @context).click (ev) ->
-			do ev.preventDefault
-			status = $(this).attr 'name'
-			unless status is 'delete' and not confirm 'Really delete?'
-				info.setStatus (->), status
-		do (@savebutton = $('button[name=save]', @context)).hide
-		@delayPicker = new TimePicker $('.delay'),
-			name: 'Delay'
-			change: (date) => info.setDelay (->), date
-		@savebutton.click (ev) =>
-			do ev.preventDefault
-			@clean true
-		new Uploader $('.upload', @context)
-		@refManager = new ReferenceList $('.references', @context), @info
-		do @initContent
-		do @draw
-		new Flippable($('.options', @context), null).addToggler $('button[name=options]', @context)
+#
+		@states = [{
+			state: 'delete'
+			label: '&#xf00d;'
+			tooltip: 'Delete'
+			active: ko.observable false
+		},{
+			state: 'maybe'
+			label: '&#xf059;'
+			tooltip: 'Maybe another time'
+			active: ko.computed => @info.status() is 'maybe'
+		},{
+			state: 'default'
+			label: '&#xf058;'
+			tooltip: 'Normal'
+			active: ko.computed => @info.status() is 'default'
+		},{
+			state: 'inbox'
+			label: '&#xf01c;'
+			tooltip: 'Put in Inbox'
+			active: ko.computed => @info.status() is 'inbox'
+		},{
+			state: 'urgent'
+			label: '&#xf0a2;'
+			tooltip: 'This is urgent!'
+			active: ko.computed => @info.status() is 'urgent'
+		}]
+		@references = observableList @info.references, (_, id) ->
+			new references[model.cache.getInformation(_, id).type] _, id
+	
+	addReference: (viewname) =>
+		((_) => @info.model.addReference _, viewname2info _, viewname) util.dummyCB
 
-	delete: =>
-		@info.removeCb 'changed', @draw
-		@info.removeCb 'deleted', @delcb
+	removeReference: (reference) =>
+		@info.model.removeReference util.dummyCB, reference.info.model
 
-	draw: =>
-		do @drawTitle
-		do @drawFrame
-		do @drawContent
-	
-	dirty: =>
-		@dirtStamp = do new Date().getTime
-		@savebutton.show 400
-		setTimeout @clean, 5000
-	
-	clean: (force) =>
-		if @dirtStamp? and (do new Date().getTime - @dirtStamp >= 5000 or force)
-			do @save
-			@dirtStamp = null
-			@savebutton.hide 1000
-	
-	drawFrame: ->
-		$(".setStatus > button", @context).removeClass 'active'
-		$(".setStatus > button[name=#{@info.status}]", @context).addClass 'active'
-		$("span.created_at", @context).attr 'x-time', @info.createdAt
-		$("span.last_edited", @context).attr 'x-time', @info.lastEdited
-		@delayPicker.setDate if @info.delay? then new Date @info.delay else null
-		@refManager.setList @info.references
-		
+	addNote: =>
+		util.doAsync (_) =>
+			note = new model.Note
+			note.create _, '', 'default'
+			console.log note.id
+			@info.model.addReference _, note
+
+	setStatus: (menuElement) =>
+		@info.model.setStatus util.dummyCB, menuElement.state
+
+# 		Delay??
+#
+# 		Refererences
+#
+# 		TimeStamps
+#
+			
+class Reference
+	constructor: (_, @id) ->
+		@info = store.getInfo _, @id
+		@hover = ko.observable false
+		@type = @info.model.type
+		@viewname = info2viewname @info.model
+		@init _
+
+references = {}
 class NoteView extends InfoView
-	@registerView /^note:(.*)$/, this, (_, match) -> "Note: #{model.cache.getInformation(_, match[1]).content}"
+	@registerView /^note\/(.*)$/, this, (_, match) -> "Note: #{model.cache.getInformation(_, match[1]).content}"
 
-	drawTitle: ->
-		@slot.setTitle 'Note'
-	
-	drawContent: (_) ->
-		@area.val @info.content
-		setTimeout _, 1
-		@area.trigger 'autosize'
+	init: (_) ->
+		@title = ko.computed => "Note: #{truncate @info.content()}"
+		@icon = 'file-alt'
+		@content = ko.observable @info.content()
+		timeout = null
+		@content.subscribe =>
+			clearTimeout timeout if timeout?
+			timeout = setTimeout (=> if @dirty() then @saveContent()), 2000
+		@info.content.subscribe (content) => @content content
+		@dirty = ko.computed => not (@content() is @info.content())
 		
+	
+	saveContent: ->
+		((_) =>
+			save = win.showMessage "Saving …"
+			@info.model.setContent _, @content()
+			setTimeout _, 1000
+			save 'Save successful!'
+		) util.dummyCB
+
+class references.note extends Reference
+	init: NoteView::init
+	saveContent: NoteView::saveContent
+
+
+###
 	initContent: ->
 #		@contentNode.html do require './template/note'
 		@area = $('textarea', @contentNode)
@@ -814,14 +858,14 @@ class ProjectView extends TaskView
 
 	drawTitle: ->
 		@slot.setTitle "Project: #{@info.description}"
-
+###
 class AsapView extends InfoView
-	@registerView /^asap:(.*)$/, this, (_, match) ->
+	@registerView /^asap\/(.*)$/, this, (_, match) ->
 		"ToDo: #{model.cache.getInformation(_, match[1]).description}"
 
-	drawTitle: ->
-		@slot.setTitle "To Do"
-
+	init: (_) ->
+		@title = @info.description
+###
 class ProjectsView extends View
 	@registerView /^projects$/, this, (_) -> 'Projects'
 
@@ -859,21 +903,110 @@ class ProjectsView extends View
 
 	delete: ->
 
-class InboxView extends View
-	@registerView /^$/, this, (_) -> 'Secretarius'
+###
+class MainView extends View
+	@registerView /^$/, this, (_) -> '&#xf040;'
 
-	constructor: (@slot) ->
+	constructor: (_, @slot) ->
+		@title = 'Secretarius'
+		@template = 'main'
+		@icon = 'pencil'
 #		@slot.setContent require('./template/main')()
-		new NoteCreator $('.newnote', @contentNode)
-		new AsapListsList $('.lists', @contentNode)
-		new AsapListCreator $('.newlist', @contentNode)
+#		new NoteCreator $('.newnote', @contentNode)
+#		new AsapListsList $('.lists', @contentNode)
+#		new AsapListCreator $('.newlist', @contentNode)
 	
 	delete: ->
+win = new WindowSlot _
+if View.test document.location.hash[1..]
+	win.setView document.location.hash[1..]
+else
+	win.setView ''
 
-info =  model.cache.getInformation _, '4dd53cb0-8bc1-11e2-ae7d-8c705ab2d594'
-for key, value of info
-	console.log "#{key}:#{value}"
-win = new WindowSlot
-win.setView document.location.hash
+ko.bindingHandlers.drop =
+	init: (element, valueAccessor) ->
+		$element = $(element)
+		$element.bind 'dragover', (ev) -> ev.originalEvent.preventDefault()
+		$element.bind 'drop', (ev) ->
+			ev.originalEvent.preventDefault()
+			valueAccessor() ev.originalEvent.dataTransfer.getData 'text/plain'
+
+ko.bindingHandlers.emitter =
+	init: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
+		ko.bindingHandlers.drag.init element, valueAccessor, allBindingsAccessor, viewModel, bindingContext
+		
+	update: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
+		ko.bindingHandlers.attr.update element, (-> { href: "##{ko.utils.unwrapObservable valueAccessor()}"}) , allBindingsAccessor, viewModel, bindingContext
+		
+ko.bindingHandlers.mouse =
+	init: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
+		ko.bindingHandlers.event.init element, (->
+			if (to = allBindingsAccessor().mouseTimeout)?
+				timeout = null
+				mouseenter: ->
+					clearTimeout timeout if timeout?
+					valueAccessor() true
+				
+				mouseleave: ->
+					clearTimeout timeout if timeout?
+					timeout = setTimeout (-> valueAccessor() false), to
+			else
+				mouseenter: ->
+					valueAccessor() true
+			
+				mouseleave: ->
+					valueAccessor() false),
+			allBindingsAccessor, viewModel, bindingContext
+
+ko.bindingHandlers.drag =
+	init: (element, valueAccessor) ->
+		$element = $(element)
+		$element.attr 'draggable', 'true'
+		$element.bind 'dragstart', (ev) =>
+			ev.originalEvent.dataTransfer.setData 'text/plain', ko.utils.unwrapObservable valueAccessor()
+			ev.originalEvent.dataTransfer.setData 'text/uri-list', "#{window.location.origin}/##{ko.utils.unwrapObservable valueAccessor()}"
+
+ko.bindingHandlers.fadeVisible =
+	init: (element, valueAccessor) ->
+		value = valueAccessor()
+		$(element).toggle ko.utils.unwrapObservable value
+	update: (element, valueAccessor) ->
+		value = valueAccessor()
+		if ko.utils.unwrapObservable(value) then $(element).fadeIn() else $(element).fadeOut()
+
+ko.bindingHandlers.autosize =
+	init: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
+		$(element).autosize()
+		setTimeout (-> $(element).trigger 'autosize') , 0
+		allBindingsAccessor().valueUpdate = 'afterkeydown'
+		ko.bindingHandlers.value.init element, valueAccessor, allBindingsAccessor, viewModel, bindingContext
+	update: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
+		setTimeout (-> $(element).trigger 'autosize') , 0
+		ko.bindingHandlers.value.update element, valueAccessor, allBindingsAccessor, viewModel, bindingContext
+
+ko.bindingHandlers.slidingList =
+	makeValueAccessor: (valueAccessor) ->
+		->
+			data: valueAccessor()
+			beforeRemove: (elem) ->
+				if elem.nodeType is 1 then $(elem).slideUp 500, -> $(elem).remove()
+			afterAdd: (elem) ->
+				if elem.nodeType is 1 then $(elem).hide().slideDown 500
+
+	init: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
+		ko.bindingHandlers.foreach.init element, ko.bindingHandlers.slidingList.makeValueAccessor(valueAccessor)
+
+	update: (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) ->
+		ko.bindingHandlers.foreach.update element, ko.bindingHandlers.slidingList.makeValueAccessor(valueAccessor), allBindingsAccessor, viewModel, bindingContext
+		
+$(document).on 'click', 'a[href=""]', -> false
+$(document).on 'click', 'a[href^="#"]', ->
+	SlotGenerator.getDefault().show $(this).attr('href')[1..]
+	false
+
+setInterval (-> $('time').html -> win.relTime $(this).attr 'datetime'), 1000
+
 $ ->
-	ko.applyBindings win
+	ko.applyBindings win, document.documentElement
+
+win.showMessage 'Welcome to Secretarius!', 10000

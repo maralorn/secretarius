@@ -63,21 +63,21 @@ compiler =
 
 parseFile = (_, filepath) ->
 	console.log new Date().toLocaleString(), 'building', filepath
-	data = fs.readFile filepath, 'utf8', _
+	data = fs.readFile filepath, _
 	used = []
 	dir = path.dirname filepath
 	ext = path.extname(filepath)[1..]
 	name = path.basename filepath, ext
 	while (comp = compiler[ext])?
 		ext = comp.ext
-		data = comp.compiler _, data, filepath
+		data = new Buffer comp.compiler _, data.toString('utf-8'), filepath
 	dirlist = dir.split path.sep
 	dirlist[0] = 'lib'
 	dir = path.join.apply null, dirlist
 	dirlist.push "#{name}#{ext}"
 	fs.mkdirp dir, _
 	filepath = path.join.apply null, dirlist
-	fs.writeFile filepath, data, 'utf8', _
+	fs.writeFile filepath, data, _
 	console.log new Date().toLocaleString(), 'built', filepath
 
 fs.remove "#{__dirname}/lib", _

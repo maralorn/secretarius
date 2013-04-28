@@ -103,7 +103,7 @@ module.exports = (connectionString) ->
 			queryOne _, t,
 				text: 'INSERT INTO information (status) VALUES ($1) RETURNING id;'
 				values: [status],
-				after: (_, res, t) ->
+				after: (_, res, t) =>
 					@id = res.id
 					@addReference _, referencing, t if referencing?
 					@id
@@ -205,13 +205,13 @@ module.exports = (connectionString) ->
 ###
 	class model.Note extends model.Information
 
-		create: (_, content, t) ->
+		create: (_, content, status = 'inbox', t) ->
 			queryNone _, t,
 				before: (_, config, t) =>
-					model.Information::create.call this, _, 'inbox', null, t
+					model.Information::create.call this, _, status, null, t
 					config.values = [@id, content]
 				text: 'INSERT INTO note (id, content) VALUES ($1, $2);'
-				after: (_) -> @id
+				after: (_) => @id
 
 		setContent: (_, content, t) ->
 			queryNone _, t,
@@ -227,7 +227,7 @@ module.exports = (connectionString) ->
 					model.Information::create.call this, _, 'default', referencing, t
 					config.values = [@id, description, parent]
 				text: 'INSERT INTO task (id, description, parent) VALUES ($1, $2, $3);'
-				after: (_) -> @id
+				after: (_) => @id
 
 		done: (_, t) ->
 			queryNone _, t,

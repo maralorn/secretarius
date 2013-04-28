@@ -1,66 +1,239 @@
+@import "font-awesome.css";
 .color1 {
-  color: #00000f;
-  background: #9999ee;
+  color: #000000;
+  background: #9cc4ff;
 }
 .color1i {
-  color: #9999ee;
-  background: #00000f;
+  color: #9cc4ff;
+  background: #000000;
 }
 .color2 {
   color: #ffffff;
-  background: #000044;
+  background: #4a93ff;
 }
 .color2i {
-  color: #000044;
-  background: #00000f;
+  color: #4a93ff;
+  background: #000000;
 }
 .color3 {
-  color: #9999ff;
-  background: #00000f;
+  color: #9cc4ff;
+  background: #1851a6;
 }
 .color3i {
-  color: #00000f;
-  background: #9999ff;
+  color: #1851a6;
+  background: #9cc4ff;
 }
 * {
   padding: 0;
   margin: 0;
+  font-size: 10pt;
+  font-family: FontAwesome, baar_sophia, Monaco, Fixed, monospace;
+}
+@font-face {
+  font-family: baar_sophia;
+  src: url('Clockopia.ttf');
+}
+body {
+  color: #1851a6;
+  background: #9cc4ff;
+  width: 60em;
+  max-width: 100%;
+  margin: 0 auto;
+}
+body a {
+  color: #1851a6;
+  background: #9cc4ff;
+  text-decoration: none;
+  transition-property: color;
+  transition-duration: 0.5s;
+}
+body a:hover {
+  color: #ffffff;
+}
+body > ul > li {
+  float: left;
+}
+body > ul > li ul {
+  position: absolute;
+}
+body > ul > li ul a {
+  color: #9cc4ff;
+  background: #1851a6;
+}
+body > ul > li ul a:hover {
+  color: #000000;
+}
+body > ul li {
+  list-style: none;
+}
+body > ul li a {
+  padding: 0.3em;
+  display: block;
+}
+body > header {
+  float: right;
+  display: block;
+  padding: 0.3em;
+}
+body > div {
+  overflow: auto;
+  color: #ffffff;
+  background: #4a93ff;
+  clear: both;
+}
+body > div a:hover {
+  color: #1851a6;
+}
+body > div h1 {
+  padding: 0.5em;
+  margin-right: 1em;
+  float: left;
+}
+body > div h1 a {
+  font-size: 15pt;
+  color: #ffffff;
+  background: #4a93ff;
+}
+body > div > article {
+  padding: 0.5em;
+}
+body > div > article span {
+  text-align: right;
+}
+body > div > article li {
+  display: inline;
+  list-style: none;
+}
+body > div > article li a {
+  background: #4a93ff;
+  color: #b0b0b0;
   font-size: 8pt;
-  font-family: Monaco, Fixed, monospace;
+}
+body > div > article h3 {
+  margin-bottom: 1em;
+}
+body > div > article h3 a {
+  font-size: 10pt;
+  color: #ffffff;
+  background: #4a93ff;
+  color: #9cc4ff;
+}
+body > div > article h1 {
+  padding: 0em;
+  padding-bottom: 0.1em;
+  margin-bottom: 0em;
+}
+body > div > article h1 a {
+  font-size: 15pt;
+  color: #ffffff;
+  background: #4a93ff;
+}
+body > div > article form a {
+  color: #ffffff;
+  background: #4a93ff;
+}
+body > div > article form textarea {
+  border: 0px;
+  padding: 0px;
+  margin: 0px;
+  color: #ffffff;
+  background: #4a93ff;
+  outline: none;
+  resize: none;
+  width: 100%;
+  overflow: hidden;
+  vertical-align: top;
+  transition-property: background-color, height;
+  transition-duration: 0.5s;
+  font-size: 10pt;
+  font-family: FontAwesome, baar_sophia, Monaco, Fixed, monospace;
+}
+body > div > article footer {
+  margin-top: 0.3em;
+  font-size: 8pt;
+  color: #9cc4ff;
+}
+body > div > article footer * {
+  transition-property: background-color, color;
+  transition-duration: 0.5s;
+}
+body > div > article footer .hover {
+  background-color: #1851a6;
+}
+body > div > article footer .hover textarea,
+body > div > article footer .hover a {
+  background-color: #1851a6;
+}
+body > div > article footer li {
+  display: block;
+  border-top: 1px solid #1851a6;
+  overflow: auto;
+}
+body > div > article footer li a {
+  color: #9cc4ff;
+}
+body > div > article footer li a:hover {
+  color: #000000;
+}
+body > div > article footer li div {
+  width: 90%;
+  float: right;
+}
+body > div > article footer p {
+  text-align: right;
+}
+body > div > article footer time {
+  font-size: 8pt;
+}
+body > div > ul > li {
+  padding: 0.5em;
+  text-align: center;
+  color: #9cc4ff;
+  background: #1851a6;
+  margin-bottom: 0.3em;
+}
+body > div > ul > li a {
+  float: right;
+  display: block;
+  margin-right: 1em;
+  color: #9cc4ff;
+  background: #1851a6;
+}
+body > div > ul > li a:hover {
+  color: #000000;
+}
+body > footer {
+  padding: 0.3em;
 }
 @font-face {
   font-family: baar_sophia;
   src: url('Clockopia.ttf');
 }
 button {
-  border: 0.1em solid #00000f;
-  color: #9999ff;
-  background: #00000f;
+  border: 0.1em solid #1851a6;
+  color: #9cc4ff;
+  background: #1851a6;
   padding: 0.3em;
   margin: 0em 0.3em 0.3em 0;
 }
 button:hover,
 .active {
-  color: #00000f;
-  background: #9999ff;
+  color: #1851a6;
+  background: #9cc4ff;
 }
 .task {
   clear: both;
-  border-top: 2px dotted #00000f;
+  border-top: 2px dotted #1851a6;
 }
 .task .children {
-  border-left: 3px solid #9999ff;
-}
-body {
-  color: #9999ff;
-  background: #00000f;
+  border-left: 3px solid #9cc4ff;
 }
 input,
 select,
 option {
-  border: 0.1em solid #00000f;
+  border: 0.1em solid #1851a6;
   color: #ffffff;
-  background: #000044;
+  background: #4a93ff;
   padding: 0.3em;
   margin: 0em 0em 0.3em 0;
   outline: none;
@@ -87,48 +260,17 @@ td {
   -webkit-transition: all 0.5s ease;
   transition: all 0.5s ease;
 }
-h1 {
-  padding: 0.5em;
-  margin-right: 0.5em;
-  margin-bottom: 0.2em;
-  font-size: 12pt;
-  color: #9999ff;
-  background: #00000f;
-  float: left;
-}
 table {
   width: 100%;
 }
 td {
   text-align: center;
 }
-#clock {
-  float: right;
-}
-#msgcontainer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  text-align: center;
-}
-#msgcontainer span {
-  display: inline-block;
-  text-align: center;
-  padding: 0.2em;
-  margin-top: 0.2em;
-  color: #00000f;
-  background: #9999ee;
-  border-radius: 0.3em;
-}
-span.reltime {
-  padding: 0em 1.5em 0em 0.5em;
-}
 .attachments,
 .references,
 .times {
-  color: #9999ff;
-  background: #00000f;
+  color: #9cc4ff;
+  background: #1851a6;
   margin: 0.2em 0em;
   padding: 0.5em;
   clear: both;
@@ -137,14 +279,14 @@ span.reltime {
 .attachments > h2,
 .references > h2,
 .times > h2 {
-  font-size: 10.4pt;
+  font-size: 13pt;
   float: left;
   margin-right: 0.5em;
   margin-bottom: 0.5em;
 }
 .referenceContainer > span {
-  color: #00000f;
-  background: #9999ee;
+  color: #000000;
+  background: #9cc4ff;
   padding: 0.2em;
   margin-right: 0.5em;
   margin-bottom: 0.5em;
@@ -154,30 +296,4 @@ span.reltime {
 }
 .projecthandle > form {
   display: inline-block;
-}
-textarea {
-  border: 0px;
-  color: #9999ff;
-  background: #00000f;
-  outline: none;
-  resize: none;
-  width: 100%;
-  margin: 0.2em 0em;
-  padding: 0.5em;
-  overflow: hidden;
-  vertical-align: top;
-  -webkit-transition: height 0.5s;
-  font-size: 8pt;
-  font-family: Monaco, Fixed, monospace;
-}
-#content,
-#header,
-#footer {
-  padding: 0.5em;
-  margin: 0.5em;
-  color: #ffffff;
-  background: #000044;
-  clear: both;
-  overflow: auto;
-  -webkit-transition: height 0.2s;
 }
