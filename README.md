@@ -17,8 +17,15 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 Acknowledgments
 ===============
 
-This project uses
+This project would not be possible without all the nice open source software out there.
+In this project code is included from the following projects:
 
-jquery
-date.extensions
-jquery.autosize-min
+* [jquery](http://jquery.com) by The jQuery Foundation (MIT License)
+* [date.extensions](https://github.com/jherdman/javascript-relative-time-helpers) by James F. Herdman (MIT License)
+* [jquery.autosize](http://www.jacklmoore.com/autosize/) by Jack Moore (MIT License)
+* [knockoutjs](http://knockoutjs.com) by Steve Sanderson (MIT License)
+* [Font Awesome](http://fortawesome.github.io/Font-Awesome/) by Dave Gandy (MIT License + SIL Open Font License)
+
+And of course a lot more dependencies in node_modules.
+
+Thanks everyone!
