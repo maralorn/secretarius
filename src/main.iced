@@ -1,4 +1,3 @@
-
 iced = require './myiced'
 iced.util.pollute global
 
@@ -14,6 +13,8 @@ connectionString = "postgresql:///#{process.env.USER}-secretarius"
 pgmodel = require './models/pgmodel'
 model = pgmodel connectionString
 
+spawn = require('child_process').spawn
+
 if argv.debug
 	do iced.util.enableDebugMode
 
@@ -25,6 +26,7 @@ switch argv._[0]
 		code = if error? then 1 else 0
 		process.exit code
 	when 'status'
+		msg = ''
 		do process.stdin.resume
 		process.stdin.setEncoding 'utf8'
 		process.stdin.on 'data', (chunk) ->
@@ -32,14 +34,21 @@ switch argv._[0]
 				obj = JSON.parse chunk[1...]
 			catch err
 			if obj?
-				await model.inbox.getSize defer(error, size)
+				mpc = spawn 'mpc', ['-f', '%title%']
+				mpc.stdout.on 'data', (data) -> msg = data.toString()
+				await
+					model.inbox.getSize defer(error, size)
 				inbox =
 					name: 'inbox'
 					full_text: if error? then 'Secretarius error' else "Inbox: #{size}"
 				if error?
 					inbox.color = "#0000ff"
-				else if size > 0
-					inbox.color = "#00ff00"
-				obj = [inbox].concat obj
+				entries = [inbox]
+				row = msg.split('\n')[0]
+				if msg.split('\n').length > 2
+					entries.push
+						name: 'mpd'
+						full_text: row
+				obj = entries.concat obj
 				chunk = ",#{JSON.stringify obj}\n"
 			process.stdout.write chunk
