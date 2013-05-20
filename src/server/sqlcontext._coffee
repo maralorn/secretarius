@@ -4,7 +4,6 @@ module.exports = (c) ->
 		python: 'plpythonu'
 		sql: 'plpgsql'
 		js: 'plv8'
-		coffee: 'plcoffee'
 	for alias, meaning of aliases
 		c[alias] = meaning
 
@@ -42,20 +41,32 @@ module.exports = (c) ->
 		for viewname, view of viewobj
 		#	views["#{viewname}_um"] = view
 			printView "#{viewname}_um", view.query
+			console.log "drop table \"#{viewname}_table\" cascade;"
 			console.log "create table \"#{viewname}_table\" as select * from \"#{viewname}_um\";"
 			obj = {}
 			obj["#{viewname}_refresh_row"] =
 				args: ["id uuid"]
-				lang: c.coffee
+				lang: c.python
 				return: "#{viewname}_table"
 				body: """
-				row = plv8.execute "select * from #{viewname}_um u where u.id = '\#{id}';"
-				row = if row.length is 1 then row[0] else null
-				old = plv8.prepare "select * from #{viewname}_table t where t.id = '\#{id}';"
-				old = if old.length is 1 then old[0] else null
-				unless JSON.stringify(row) is JSON.stringify(old) and row is not null
-					plv8.execute "delete from #{viewname}_table t where t.id = '\#{id}';"
-					plv8.execute "insert into #{viewname}_table select * from #{viewname}_um u where u.id = '\#{id}';"
+				import json
+				plan = plpy.prepare("select * from #{viewname}_um u where u.id = $1;", ["uuid"])
+				row = plpy.execute(plan, [id])
+				if len(row) == 1:
+					row = row[0]
+				else:
+					row = None
+				plan = plpy.prepare("select * from #{viewname}_table t where t.id = $1;", ["uuid"])
+				old = plpy.execute(plan, [id])
+				if len(old) == 1:
+					old = old[0]
+				else:
+					None
+				if row != old:
+					plan = plpy.prepare("delete from #{viewname}_table t where t.id = $1;", ["uuid"])
+					plpy.execute(plan, [id])
+					plan = plpy.prepare("insert into #{viewname}_table select * from #{viewname}_um u where u.id = $1;", ["uuid"])
+					plpy.execute(plan, [id])
 				return row
 				"""
 			obj["#{viewname}_trigger"] =
@@ -96,6 +107,7 @@ module.exports = (c) ->
 					plpy.execute("create or replace view \\"#{viewname}\\" as select "+fields+" from #{viewname}_table r where expires is null or expires >= current_timestamp union select "+fields+" from (select (#{viewname}_refresh_row(id)).* from #{viewname}_table where expires is not null and expires < current_timestamp) as r;") $$ language plpythonu;"""
 
 	printTrigger = (name, trigger) ->
+		console.log "drop trigger #{name} on \"#{trigger.table}\";"
 		console.log "create trigger #{name} after #{trigger.events.join ' or '} on \"#{trigger.table}\" for each row #{if trigger.when? then "when (#{trigger.when}) " else ''}execute procedure #{trigger.cmd};"
 	
 	c.trigger = (triggers) ->

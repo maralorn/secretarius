@@ -10,200 +10,33 @@ html
 		style(type='text/css', data-bind="text: 'a[href=\\'#' + viewname() +'\\'] { font-weight: bold; }'")
 		script(src='secretarius.js', type='text/javascript')
 
-
-
-
-		script#asap(type='text/html')
-			.asap.task
-				| To Do:&nbsp; 
-				span.description
-				| &nbsp;List:&nbsp; 
-				span.list
-				span(style='float:right;')
-					input(name='completed', type='checkbox')
-					button(name='delete') X
-
-		script#asap(type='text/html')
-			form
-				input(name='asap')
-				| List:
-				span.listsel
-				| Project:
-				span.projectsel
-				button Create ToDo
-
-		script#asap(type='text/html')
-			button(name='toggleshow') Show all
-			table
-				thead
-					tr
-						th Done
-						th Description
-						th Project
-						th Deadline
-						th References
-						th Last Changed
-						th Created At
-						th Delay
-						th Move To
-						th Delete
-				tbody
-			.newtodo
-			form
-				input(name='newname')
-				button Rename
-
-		script#asap(type='text/html')
-			h2 New ToDo List
-			form(name='list')
-				input(name='list')
-				button(type='submit') New ToDo List
-
-		script#asap(type='text/html')
-
-		script#asap(type='text/html')
-
-		script#asap(type='text/html')
-			h1
-			.inboxinfo
-			.front
-				button(name='asap') New ToDo
-				button(name='project') New Project
-			.back
-				button Cancel
-				.newproject
-				.newasap
-		script#asap(type='text/html')
-			span
-				span.label
-				button x
-		script#asap(type='text/html')
-			.infocontent
-			button(name='save') Save
-			.options
-				.setStatus
-					button(name='delete') Delete
-					button(name='default') Normal
-					button(name='maybe') Maybe
-					button(name='inbox') Inbox
-					button(name='urgent') Urgent
-				.delay
-				.times
-					| Last Change:
-					span.reltime.last_edited
-					| Created:
-					span.reltime.created_at
-				.references
-					h2 References
-				.attachments
-					h2 Attachments
-					.upload
-			button(name='options') Toggle Options
-		script#asap(type='text/html')
-			span infolabel
-		script#asap(type='text/html')
-			tr
-				td
-					input(type='checkbox')
-				td.desc
-					span
-					form
-						input(type='text')
-						button Rename
-				td.project
-				td.deadline
-				td.refs
-				td.last.reltime
-				td.create.reltime
-				td.delay
-				td.listsel
-				td
-					button(name='delete') Delete
-		script#asap(type='text/html')
-			span msg
-		script#asap(type='text/html')
-			h2 New Note
-			form(name='note')
-				input(name='note')
-				button(type='submit') New Note
-		script#asap(type='text/html')
-			.project.task
-				.projecthandle
-					button.collapse
-					form
-						span.name
-						input(type='text')
-						button Rename
-					span(style='float:right;')
-						input(name='completed', type='checkbox')
-						button(name='delete') X
-				.children
-		script#asap(type='text/html')
-			form
-				input(name='project')
-				| Parent:
-				span.parentpicker
-				button Create Project
-		script#asap(type='text/html')
-			button(name='toggleshow') Show all
-			.tasklist
-			.root /
-		script#asap(type='text/html')
-			.front
-				button Set
-				span 
-					span.reltime
-					button Change
-			.back
-				form
-					input(name='day', size=2)
-					| .
-					input(name='month', size=2)
-					| .
-					input(name='year', size=4)
-					| &nbsp;&nbsp;&nbsp;
-					input(name='hour', size=2)
-					|:
-					input(name='minute', size=2)
-					|:
-					input(name='second', size=2)
-				button Abort
-				button(name='delete') Delete
-				button(name='save') Save
-		script#asap(type='text/html')
-			button Upload new
-			form
-				input(type="file")
-				button Cancel
-				button Upload
-
-
-
-
 		script#selector(type='text/html')
 			// ko with: selector
 			a(href='', data-bind='click: toggle.bind(delayed), css: {active: delayed}', title='Hide not yet active tasks')
-				| &nbsp;
 				i.icon-time
-				| &nbsp;
 			a(href='', data-bind='click: toggle.bind(blocked), css: {active: blocked}', title='Hide tasks blocked by dependency')
-				| &nbsp;
 				i.icon-lock
-				| &nbsp;
 			a(href='', data-bind='click: toggle.bind(completed), css: {active: completed}', title='Hide completed tasks')
-				| &nbsp;
 				i.icon-check
-				| &nbsp;
 			// /ko
 
 		script#asaplistview(type='text/html')
 			h1(data-bind='text: info.name')
-			// ko template: 'selector'
-			// /ko
+			span(data-bind='template: "selector"')
+			// ko fadeVisible: innerSlot.view
+			menu
+				a(data-bind='click: innerSlot.clear', style='float:right')
+					i.icon-remove-sign
 			section(data-bind="template: {name: 'slot', data: innerSlot}")
+			// /ko
 			ul(data-bind='slidingList: list')
 				li
+					a(href='', data-bind='click:toggleDone')
+						i(data-bind='css:{"icon-check": done, "icon-check-empty": !done()}')
 					a(href='', data-bind='text: description, click: $parent.setFocus')
+					// ko with: project()
+					a(href='', style="float:right;", data-bind='text: description, click: $parents[1].setFocus')
+					// /ko
 
 		script#notereference(type='text/html')
 			// ko template: "noteview"
@@ -211,37 +44,75 @@ html
 
 		script#noteview(type='text/html')
 			form
-				textarea(placeholder='Note is empty…', data-bind='autosize: content')
-				a(href='', data-bind='fadeVisible: dirty, click: saveContent') &#xf0c7;
+				textarea(placeholder='Note is empty…', data-bind='autosize: content', rows='1')
 
 		script#asapview(type='text/html')
-			| asap …
+			a(href='', data-bind='click:toggleDone')
+				i(data-bind='css:{"icon-check": done, "icon-check-empty": !done()}')
+			form(data-bind='event: {submit: save}')
+				input(type='text', data-bind='value: description, valueUpdate: "afterkeydown"')
+			// ko with: project()
+			a(href='', style="float:right;", data-bind='text: description, emitter: "project/" + id()')
+			// /ko
+			//			select(data-bind='options: asaplists, optionsText: "label", value: selectedList')
+			// ko template: {name: 'timepicker', data: deadlinePicker}
+			// /ko
+
+		script#timepicker(type='text/html')
+			// ko if: value() != null
+			span(data-bind='text: name')
+			| :
+			time(data-bind='attr: { datetime: value }, text: $root.relTime(value())')
+			a(href='', data-bind='click: remove') Remove
+			// /ko
+			// ko if: value() == null
+			a(href='', data-bind='click: set')
+				| Set 
+				span(data-bind='text: name')
+				|  to
+			select(data-bind='options: options, optionsText: "label", value: selectedDate')
+			// /ko
+
+		script#projectview(type='text/html')
+			| project …
+
+		script#projects(type='text/html')
+			| projects …
 
 		script#inbox(type='text/html')
-			section(data-bind="fadeVisible: full, template: {name: 'slot', data: innerSlot}")
+			header(data-bind='fadeVisible: !full()')
+				h3 Inbox is empty
+			// ko fadeVisible: full
+			section(data-bind="template: {name: 'slot', data: innerSlot}")
+			// /ko
 
 		script#info(type='text/html')
 			ul(data-bind='foreach: states')
 				li
 					a(href='', data-bind="html: label, style: { color: active() ? 'white' : '' }, click: $parent.setStatus, attr: { title: tooltip}")
 
+			a(href='', data-bind='fadeVisible: dirty, click: save')
+				i.icon-save
 			div(data-bind="template: type + 'view'")
 			footer
+				// ko template: {name: 'timepicker', data: delayPicker}
+				// /ko
 				h3(data-bind='drop: addReference') 
-					i.icon-hand-right
-					|  References 
+					|  References
 					a(href='', data-bind='click: addNote')
-						i.icon-file-alt
+						i.icon-pushpin
 						|  Add Note
 				ul(data-bind='slidingList: references')
 					li(data-bind='mouse: hover, css: { hover: hover}')
-						a(data-bind='emitter: viewname, fadeVisible: hover')
-							i(data-bind='css: "icon-" + icon')
+						a(href='', data-bind='fadeVisible: dirty, click: save')
+							i.icon-save
 						a(href='', data-bind='click: $parent.removeReference, fadeVisible: hover')
 							i.icon-remove
+						a(data-bind='emitter: viewname, fadeVisible: hover')
+							i(data-bind='css: "icon-" + icon')
 						div(data-bind='template: type + "reference"')
 				p
-					i.icon-edit
+					i.icon-edit-sign
 					time(data-bind='attr: { datetime: info.lastEdited }, text: $root.relTime(info.lastEdited())')
 					br
 					i.icon-asterisk

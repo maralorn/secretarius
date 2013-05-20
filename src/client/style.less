@@ -50,12 +50,12 @@
 }
 
 @font: FontAwesome, baar_sophia, Monaco, Fixed, monospace;
-@fontsize: 10pt;
+@fontsize: 14pt;
 
 
 body{
 	.color3i;
-	width: 60em;
+	width: 45em;
 	max-width: 100%;
 	margin: 0 auto;
 	a {
@@ -66,6 +66,9 @@ body{
 		&:hover {
 			color: @bg3a;
 		}
+	}
+	i[class*='icon-'] {
+		padding: 0 0.3em;
 	}
 	> ul {
 		> li {
@@ -125,12 +128,27 @@ body{
 					font-size: 0.8 * @fontsize;
 				}
 			}
+			article > a {
+				float: right;
+			}
 			div {
+				> menu {
+					padding: 0.3em;
+					display: inline-block;
+					float: right;
+				}
 				> a {
+					float: left;
+				}
+				input {
+					border: 0px;
+				}
+				> span > a {
 					display: inline-block;
 					padding: 0.3em;
 					color: @inactive;
 					text-decoration: line-through;
+					font-weight: bold;
 					&.active {
 						text-decoration: none;
 						.color2;
@@ -141,6 +159,9 @@ body{
 					padding: 0.5em;
 					clear: both;
 					.color3;
+					select, input {
+						.color3;
+					}
 					a {
 						.color3;
 						&:hover {
@@ -149,9 +170,10 @@ body{
 					}
 				}
 				> ul {
+					clear: both;
 					> li {
 						display: block;
-						border-top: 1px solid @bg3;
+						border-bottom: 1px solid @bg3;
 						transition-property: background-color;
 						transition-duration: 0.5s;
 						a {
@@ -188,6 +210,7 @@ body{
 					border: 0px;
 					padding: 0px;
 					margin: 0px;
+					min-size: 18px;
 					.color2;
 					outline: none;
 					resize: none;
@@ -199,9 +222,25 @@ body{
 					font-size: @fontsize; font-family: @font;
 				}
 			}
+			select {
+				margin: 0;
+				paading: 0;
+				-webkit-border-radius: 2px;
+				-webkit-padding-end: 2px;
+				-webkit-padding-start: 2px;
+				-webkit-user-select: none;
+				background-position: center right;
+				background-repeat: no-repeat;
+				border: 0px solid #AAA;
+				color: @fg2;
+				font-size: @fontsize;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap
+			}
 			footer {
 				clear: both;
-				* {
+				textarea, li, a {	
 					transition-property: background-color, color;
 					transition-duration: 0.5s;
 				}
@@ -217,10 +256,11 @@ body{
 						&:hover{ 
 							color: @fg3a;
 						}
+						float: right;
 					}
 					div {
-						width: 90%;
-						float: right;
+						display: inline-block;
+						width: 80%;
 					}
 					display: block;
 					border-top: 1px solid @bg3;

@@ -13,6 +13,7 @@
 	"jquery":"",
 	"knockout":"",
 	"fs-extra":"",
+	"moment":"",
 	"glob": ""
   },
   "dependencies": {

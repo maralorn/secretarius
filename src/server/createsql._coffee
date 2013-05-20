@@ -98,18 +98,24 @@ table asap:
 
 func getInformation:
 	return: JSON
-	lang: coffee
+	lang: python
 	args: ["id uuid"]
 	body: """
-type = plv8.execute "SELECT type FROM type WHERE id='\#{id}'"
-return JSON.stringify if type.length == 0 then {} else plv8.execute("select * from \#{type[0]['type']}view WHERE id='\#{id}'")[0]
+import re
+plan = plpy.prepare("SELECT type FROM type WHERE id=$1", ["uuid"])
+type = plpy.execute(plan, [id])
+if len(type) > 0:
+	plan = plpy.prepare("select row_to_json(info) as info from " + type[0]['type'] + "view as info WHERE id=$1", ["uuid"])
+	return re.sub(r"\\"(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+\\+\\d{2})\\"", "\\"\\g<1>00\\"", plpy.execute(plan, [id])[0]['info'])
+else:
+	return "{}"
 """
 
 func setTimestamp:
 	return: TRIGGER
 	lang: python
 	body: """
-plan = SD.setdefault("plan", plpy.prepare("update information set \\"lastEdited\\"=CURRENT_TIMESTAMP WHERE id=$1", ["uuid"]))
+plan = plpy.prepare("update information set \\"lastEdited\\"=CURRENT_TIMESTAMP WHERE id=$1", ["uuid"])
 for state in ['new', 'old']:
 	if state in TD and TD[state] != None:
 		id = TD[state]['id']
@@ -131,34 +137,34 @@ for id in ids:
 
 func notify:
 	return: TRIGGER
-	lang: coffee
+	lang: python
 	body: """
-plv8.execute "NOTIFY \#{TG_ARGV[0]};"
+plpy.execute("NOTIFY " + TD["args"][0] + ";")
 """
 func new:
 	return: TRIGGER
-	lang: coffee
+	lang: python
 	body: """
-msg =
-	type: TG_ARGV[0]
-	id: NEW.id
-plv8.execute "NOTIFY new, '\#{JSON.stringify msg}';"
+import json
+msg = json.dumps({"type": TD["args"][0],"id": TD["new"]["id"]})
+plpy.execute("NOTIFY new, '" + msg + "';")
 """
 func deleted:
 	return: TRIGGER
-	lang: coffee
+	lang: python
 	body: """
-msg =
-	type: TG_ARGV[0]
-	id: OLD.id
-plv8.execute "NOTIFY deleted, '\#{JSON.stringify msg}';"
+import json
+msg = json.dumps({"type": TD["args"][0],"id": TD["old"]["id"]})
+plpy.execute("NOTIFY deleted, '" + msg + "';")
 """
 func unnull:
 	return: 'uuid[]'
-	lang: coffee
+	lang: python
 	args: ['"array" uuid[]']
 	body:"""
-		return if array[0]? then array else []
+		if array[0] == None: 
+			return []
+		return array
 """
 
 view infoview0: select
@@ -336,13 +342,17 @@ create or replace view taskParents as
 
 func catchCycles:
 	return: TRIGGER
-	lang: coffee
+	lang: python
 	body: """
 count = 0
-if NEW.parent?
-	[count: count] = plv8.execute "select count(*) from taskParents where id='\#{NEW.parent}' and parent='\#{NEW.id}';"
-return NEW if count is 0 and NEW.id isnt NEW.parent
-throw 'Parent cycle detected.'"""
+if TD['new']['parent'] != None:
+	plan = plpy.prepare("select count(*) from taskParents where id=$1 and parent=$2;", ["uuid", "uuid"])
+	count = plpy.execute(plan, [TD['new']['parent'], TD['new']['id']])[0]["count"]
+if count > 0 or TD['new']['id'] == TD['new']['parent']:
+	raise Exception('Parent cycle detected. ' + str(count))
+else:
+	return "OK"
+"""
 
 console.log 'create trigger catchCycles before update or insert on task for each row execute procedure catchCycles();'
 
